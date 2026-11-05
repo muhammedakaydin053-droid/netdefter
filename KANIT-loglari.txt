@@ -1,0 +1,658 @@
+================ npm-test.log ================
+### npm test
+
+> test
+> node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/data/timeline.test.ts src/lib/smart/budget.test.ts src/lib/smart/progress.test.ts src/lib/smart/explain.test.ts src/lib/smart/mock-bands.test.ts src/data/references.test.ts src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts src/lib/store.merge.test.ts
+
+✔ non-canvas app with no custom card gets a soft BRAND NOTE (utility exception) (3.45072ms)
+✔ non-canvas app with a compliant card is silent (1.2929ms)
+✔ card file without site.json card=custom warns (0.90789ms)
+✔ card file with missing site.json warns for card=custom (1.30603ms)
+✔ card file with invalid site.json warns for card=custom (1.44321ms)
+✔ oversized card warns for non-canvas apps too (2.73684ms)
+✔ canvas app with no card warns 'missing' and missing og:type (1.24133ms)
+✔ canvas card without type still warns for og:type (1.51212ms)
+✔ oversized card warns on the scraper budget (jpg and legacy png) (3.98534ms)
+✔ compliant game (custom card + site.json type + x-banner) is silent (3.0372ms)
+✔ __root.tsx og:type no longer satisfies the canvas gate (2.0932ms)
+✔ oversized x-banner warns on the same scraper budget as og.jpg (2.21557ms)
+✔ legacy png + site.json type still needs the X feed card (1.24701ms)
+✔ siteDeclaresOgTypeGame reads the site contract (0.14307ms)
+✔ normalizes whitespace before hashing (2.10461ms)
+✔ nullish and blank body text normalize to the empty string (0.26759ms)
+✔ body text prefix is normalized and capped (0.18562ms)
+✔ identical runs do not diverge (0.9406ms)
+✔ status change diverges (0.44874ms)
+✔ title change diverges (0.2305ms)
+✔ title comparison is skipped when either side lacks one (0.34325ms)
+✔ canvas disappearing diverges; canvas appearing does not (0.45758ms)
+✔ horizontal overflow appearing diverges; clearing does not (0.20234ms)
+✔ new console errors diverge (0.255499ms)
+✔ errors already present in the baseline do not re-diverge (0.1831ms)
+✔ body text collapse diverges (0.17722ms)
+✔ body text dropping to zero reports collapse (0.177631ms)
+✔ zero-length baseline reports growth via the hash branch, not collapse (0.16934ms)
+✔ hash mismatch with a trivial length delta and same page start is tolerated (0.13508ms)
+✔ hash mismatch with a trivial length delta but changed page start diverges (0.12806ms)
+✔ prefix check is skipped when either side lacks a prefix (0.2032ms)
+✔ length-delta tolerance boundary: 50 tolerated, 51 diverges (500-char baseline) (0.14632ms)
+✔ length-delta floor dominates small baselines: 20 tolerated, 21 diverges (100-char baseline) (0.10929ms)
+✔ collapse boundary: exactly half is 'changed', one below is 'collapsed' (0.11394ms)
+✔ missing baseline viewport diverges (0.1188ms)
+✔ empty or null baseline diverges for every viewport (0.16983ms)
+✔ degenerate current verdict fails closed (0.213499ms)
+✔ multiple signals across viewports all accumulate (0.09666ms)
+✔ baselineComparison round-trips a valid baseline (0.17252ms)
+✔ baselineComparison fails closed on malformed or wrong-shape baselines (0.32145ms)
+✔ parseSmokeArgs defaults (0.23431ms)
+✔ parseSmokeArgs consumes --baseline without shifting positionals (0.11907ms)
+✔ parseSmokeArgs rejects a trailing --baseline flag (0.11214ms)
+✔ parseSmokeArgs supports the --baseline= form (0.12803ms)
+✔ parseSmokeArgs rejects unknown flags instead of treating them as positionals (0.12538ms)
+✔ parseSmokeArgs env fallback and flag precedence (0.12663ms)
+✔ derivedPaths handles .png, .PNG, and extensionless inputs (0.26593ms)
+✔ exitCodeFor: clean run exits 0 (0.16115ms)
+✔ exitCodeFor: errors in any single viewport exit 2 (0.14343ms)
+✔ exitCodeFor: navigation failure in any viewport exits 1, beating errors (3.22921ms)
+✔ exitCodeFor: 4xx boundary and missing status (0.17818ms)
+✔ exitCodeFor: no viewport data is a failure (0.11492ms)
+✔ browser-smoke wires the guard and verdict helpers (1.25323ms)
+✔ browser-smoke file I/O only touches guarded paths (0.55946ms)
+✔ the flag predicate matches src/lib/auth (1.74342ms)
+✔ reads the value a live dev server resolved (0.40515ms)
+✔ a server started without the flag reads as sign-in on (0.20425ms)
+✔ agreement passes (0.27189ms)
+✔ divergence fails in either direction (0.48412ms)
+✔ an unobservable dev server is indeterminate, not agreement (0.19057ms)
+✔ a dev server that cannot be reached probes as null (0.28727ms)
+✔ a server without the endpoint probes as null, not as agreement (0.5624ms)
+✔ only a divergence warns the smoke verdict (1.04489ms)
+✔ the build side resolves the template's shipped app-env (1.84756ms)
+✔ the CLI reports rather than silently passing when run via a symlink (80.595118ms)
+✔ injects before </head> (6.1519ms)
+✔ injects the extensions script without a project id (0.49056ms)
+✔ injects project id on the script and meta when provided (0.37767ms)
+✔ does not duplicate grok:app_id (0.68628ms)
+✔ omits x:creator tags without both creator values (0.95757ms)
+✔ injects x:creator tags when both creator values are set (0.31436ms)
+✔ escapes x:creator values (0.16571ms)
+✔ does not duplicate x:creator tags (0.47516ms)
+✔ platform chrome overwrites share-card metas and always sets og:title (0.86504ms)
+✔ does not duplicate twitter:card or og:title (0.7429ms)
+✔ a baked site.image is treated as a custom card (0.77993ms)
+✔ baked identity does not need a workspace filesystem (0.51249ms)
+✔ a public card file wins over a baked site without card=custom (0.58364ms)
+✔ public/og.png wins when jpg is absent (0.44105ms)
+✔ resolveOgCardAsset: disk file, then bake, then empty (placeholder) (0.54571ms)
+✔ snapshotOgIdentity stamps card=custom from a public card file (0.41068ms)
+✔ snapshotOgIdentity stamps banner from public/x-banner.jpg (0.44594ms)
+✔ emits x:game:image for a public host when site.banner is set (0.24465ms)
+✔ does not emit x:game:image without a public host or banner (0.23607ms)
+✔ site title Grok App is a real name, not a sentinel (0.27812ms)
+✔ published grok.me slug is still a title fallback (0.33943ms)
+✔ rejects Vercel system hosts as og:image origins (0.0908ms)
+✔ published VITE_PUBLIC_HOSTNAME wins over request Host for og:image (0.31598ms)
+✔ vercel Host without a public hostname emits no og:image (0.22627ms)
+✔ emits og:image for a public host and prefers a custom card (0.27306ms)
+✔ placeholder og:image appends site.color when it is 6-digit hex (0.29032ms)
+✔ document title entities are not double-escaped on og:title (0.19816ms)
+✔ site.json title wins over the host slug (0.2104ms)
+✔ injects into documents with no head element (0.32908ms)
+✔ streaming injector matches </HEAD> case-insensitively (0.46956ms)
+✔ does not duplicate the extensions script (0.29904ms)
+✔ is idempotent (0.28363ms)
+✔ uses the app name in the injected title tag (0.17962ms)
+✔ streaming injector handles </head> split across chunks (0.51699ms)
+✔ streaming injector passes post-head chunks through untouched (0.34682ms)
+✔ streaming injector falls back when no </head> is seen (0.31484ms)
+✔ detects install query (0.43852ms)
+✔ filters non-document paths (0.36912ms)
+✔ strips install params from the app link (0.164369ms)
+✔ names the install page from host slug (0.10551ms)
+✔ rejects hosts that are not plain slugs (0.0858ms)
+✔ renders install page markup (1.070871ms)
+✔ escapes host-derived values in the install page (0.19181ms)
+✔ renders the manifest with the per-app name (0.24603ms)
+✔ vite config keeps the nitro serverDir wiring (0.21127ms)
+✔ nitro middleware and its bundled assets exist (5.124119ms)
+✔ vite plugin bakes og identity as a virtual module (0.22708ms)
+✔ _migrations keys on basename, not path (2.24712ms)
+✔ a file already applied from another directory does not re-apply (0.81264ms)
+✔ pending migrations are returned in name order (7.58855ms)
+✔ non-.sql entries are dropped (readdir also yields the auth/ directory) (0.13665ms)
+✔ the auth schema ships outside the globbed directory (0.31153ms)
+✔ this workspace's auth schema copy is byte-identical to its source (0.22237ms)
+✔ the copy check reads both files and catches an edit (0.80939ms)
+✔ preview: a successful sign-out clears the token, then redirects (3.96735ms)
+✔ preview: a rejected sign-out still clears the token and redirects (0.4025ms)
+✔ preview: a sign-out that throws synchronously still clears and redirects (0.3595ms)
+✔ preview: a sign-out that never settles clears and redirects once the wait expires (9.814079ms)
+✔ preview: no bearer means nothing to invalidate, so no request is made (0.43685ms)
+✔ preview: a stored bearer is still invalidated server-side (0.14631ms)
+✔ deployed: a confirmed sign-out clears the token, then redirects (0.18829ms)
+✔ deployed: a sign-out that never settles throws and does NOT redirect (20.12692ms)
+✔ deployed: a rejected sign-out throws and does NOT redirect (0.49153ms)
+✔ deployed: the timeout is distinguishable from a rejection (20.31928ms)
+✔ settleWithin reports the outcome and never rejects (20.878649ms)
+✔ settleWithin waits its full window, then gives up rather than hanging (0.52238ms)
+✔ pre-sign-in: the preview clear gives up at the preview bound (0.56427ms)
+✔ pre-sign-in: a deployed session gets the deployed window, not the preview one (0.44323ms)
+✔ pre-sign-in: a failed clear never blocks sign-in (0.32899ms)
+✔ pre-sign-in: the preview skips the request when there is no bearer (0.15608ms)
+✔ every sign-out bound comes from one rule (0.06818ms)
+✔ the defaults are bounded, and deployed waits longer than preview (0.19626ms)
+✔ keeps VITE_-prefixed string entries (1.79073ms)
+✔ drops non-VITE keys, non-string values and malformed documents (0.24832ms)
+✔ a missing app-env.json is a clean no-op (0.47343ms)
+✔ reads the app env from a workspace (0.50877ms)
+✔ an explicit process-env override wins over the file (0.23445ms)
+✔ the template ships auth off (0.28942ms)
+✔ vite loadEnv resolves the wrapped value (0.46822ms)
+✔ the wrapped command runs with the app env applied (62.530819ms)
+✔ the wrapped command sees an explicit override, not the file value (57.045898ms)
+✔ the wrapper propagates the command's exit code (52.802549ms)
+✔ a signal-killed command is never reported as success (56.764589ms)
+✔ the CLI still runs when invoked through a symlinked path (58.532159ms)
+ℹ tests 149
+ℹ suites 0
+ℹ pass 149
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 560.084609
+▶ curriculum.json
+  ✔ has no fully duplicate records (1.01413ms)
+  ✔ uses only TYT and AYT as exam names (0.65443ms)
+✔ curriculum.json (2.92514ms)
+▶ roadmap + guaranteed references
+  ✔ every GuaranteeRow topic exists in curriculum.json (0.75145ms)
+  ✔ every gate / core topic array resolves to a real curriculum topic (0.92267ms)
+  ✔ every inline { exam, subject, topic } row in roadmap.ts exists in curriculum.json (0.75581ms)
+  ✔ kapı konu sayısı metinlerde doğru yazılmış (0.59116ms)
+✔ roadmap + guaranteed references (3.47748ms)
+▶ daysBetweenISO / addDaysISO
+  ✔ counts calendar days across a month boundary (0.65589ms)
+  ✔ round-trips with addDaysISO (0.34362ms)
+  ✔ handles the leap day in 2028 (0.23712ms)
+✔ daysBetweenISO / addDaysISO (3.34108ms)
+▶ buildTimeline
+  ✔ produces five contiguous phases from start to exam (0.21299ms)
+  ✔ keeps the final period free of new topics (0.20105ms)
+  ✔ anchors phase boundaries to the user's target dates (0.68112ms)
+  ✔ opens new topics in the first three phases (0.19952ms)
+  ✔ raises mock intensity as the exam approaches (0.20244ms)
+  ✔ falls back to proportional phases when targets are out of order (0.26514ms)
+  ✔ collapses safely when the window is shorter than the reserve (0.31412ms)
+✔ buildTimeline (2.62435ms)
+▶ phaseFor
+  ✔ returns the phase containing the date (0.2358ms)
+  ✔ falls back to the last phase outside the range (0.11429ms)
+✔ phaseFor (0.55084ms)
+▶ teachingDays
+  ✔ excludes one rest day per week (0.18944ms)
+  ✔ returns zero when the window is empty or inverted (0.12591ms)
+✔ teachingDays (0.46386ms)
+▶ callTool failure memo
+  ✔ replays an identical failure within the memo window without refetching (8.255699ms)
+  ✔ keys by token identity so a reminted token shares the memo entry (1.3486ms)
+  ✔ sweeps expired entries on write so unique keys do not accumulate (3.02629ms)
+  ✔ never memoizes login-required 401s (1.22964ms)
+✔ callTool failure memo (16.188109ms)
+▶ callTool
+  ✔ resolves ok:false for non-serializable args instead of rejecting (0.5882ms)
+✔ callTool (0.79268ms)
+▶ isLoginRequired
+  ✔ is true only for login-required failures (0.24714ms)
+✔ isLoginRequired (0.4483ms)
+▶ redirectToLoginIfRequired
+  ✔ no-ops when login is not required (1.42131ms)
+  ✔ navigates to the server-built loginUrl in the browser (0.39181ms)
+  ✔ returns false when the result has no loginUrl (0.36582ms)
+  ✔ returns false on the server (no window) (0.40034ms)
+✔ redirectToLoginIfRequired (3.06634ms)
+▶ verifyGateIdentityToken
+  ✔ returns the identity for a valid token (16.88464ms)
+  ✔ omits optional claims as nulls (3.00945ms)
+  ✔ rejects a wrong audience (2.04491ms)
+  ✔ rejects a wrong issuer (1.53232ms)
+  ✔ rejects an expired token (1.86715ms)
+  ✔ rejects a token without exp (4.2876ms)
+  ✔ rejects a token signed by a different key with the same kid (1.65182ms)
+  ✔ refetches the JWKS when the kid rotates (2.62566ms)
+✔ verifyGateIdentityToken (35.92885ms)
+▶ gateIdentityFromHeaders
+  ✔ verifies the header token end to end and fails closed without it (24.443079ms)
+  ✔ activates on a deployed-shaped request without GROK_GATE_ORIGIN (1.69817ms)
+  ✔ fails closed when GROK_PROJECT_ID is unset (0.98473ms)
+✔ gateIdentityFromHeaders (27.628299ms)
+▶ sessionBoundToGateIdentity
+  ✔ keeps the session when it is bound to the same gate sub (0.20914ms)
+  ✔ rotates when the session belongs to a different gate sub (0.11257ms)
+  ✔ rotates when the session user has no gate-bound account (0.11115ms)
+✔ sessionBoundToGateIdentity (0.64274ms)
+▶ splitBudget
+  ✔ yeni konuya en az 55 dakika ayırır (0.83548ms)
+  ✔ 240 dk bütçede tekrarlara yeni konuyu ezecek kadar pay bırakmaz (0.13232ms)
+  ✔ günde 2 ve 3 konu hedefinde rezervi büyütür (0.13391ms)
+  ✔ rezervi günlük hedefe göre verir, bütçeyi aşmaz (0.15765ms)
+  ✔ pazar günü rezerv ayırmaz (yeni konu açılmıyor) (0.14773ms)
+  ✔ sabit görevler bütçeyi aşarsa tekrar payı negatife düşmez (0.11714ms)
+  ✔ tekrar payı hiçbir durumda negatif olmaz (0.23048ms)
+  ✔ yeni konu rezervi ile tekrar payı toplamı odayı aşmaz (0.2709ms)
+  ✔ gecikmiş kritik tekrar varsa bir yeni konudan feragat eder (0.16392ms)
+✔ splitBudget (4.31152ms)
+▶ slotsPerDay
+  ✔ 240 dk bütçede günde 2 slot verir (0.31653ms)
+  ✔ sabit görevler bütçeyi yerse 0 döner (0.09208ms)
+  ✔ taşıma (carry) dakikası slot açabilir (0.06454ms)
+✔ slotsPerDay (0.69195ms)
+▶ capacity
+  ✔ pazar ve deneme günlerini kapasiteden düşer (0.33348ms)
+  ✔ 185 konuyu 146 günde karşılar (varsayılan ayarlar) (0.25587ms)
+  ✔ öğretim günü yoksa perDay 0 ve kapasite 0 olur (0.12318ms)
+✔ capacity (0.92476ms)
+▶ explainStage — learningStage ile tutarlılık
+  ✔ mastered alanı her girdide learningStage ile aynı (1.32801ms)
+  ✔ eşikler tek kaynaktan gelir ve beklenen değerlerdir (0.16667ms)
+  ✔ 14/14 için başarı yeterli ama soru yetersiz mesajı verir (0.25525ms)
+  ✔ 15/15 için öğrenildi mesajı verir (0.11114ms)
+  ✔ 13/20 için başarı düşük mesajı verir (0.1524ms)
+  ✔ soru verisi olmayan 'Bitti' konuyu anlatım aşamasında bırakır (0.09978ms)
+✔ explainStage — learningStage ile tutarlılık (1032.923509ms)
+▶ explainStage — 'Tekrar Gerekli' açıklaması
+  ✔ 'Tekrar Gerekli' için 'tamamlanmadı' DEMEZ, tekrar gerekçesi verir (0.34981ms)
+  ✔ soru ve başarı yeterli olsa bile 'Tekrar Gerekli' öğrenildi sayılmaz (0.13273ms)
+  ✔ 'Tekrar Gerekli' + yetersiz soru: her iki gerekçe de doğru yazılır (0.17485ms)
+  ✔ soru verisi olmayan 'Tekrar Gerekli' de 'tamamlanmadı' demez (0.18518ms)
+  ✔ 'Başlamadım' hâlâ 'tamamlanmadı' der (regresyon koruması) (0.0903ms)
+  ✔ 'Çalışıyorum' hâlâ 'tamamlanmadı' der (regresyon koruması) (0.08247ms)
+✔ explainStage — 'Tekrar Gerekli' açıklaması (1.38486ms)
+▶ gateBlockers — kapıyı kapatan konular
+  ✔ kapı açıkken hiç engel döndürmez (0.30653ms)
+  ✔ eksik konuları adlarıyla ve gerekçesiyle listeler (0.30157ms)
+  ✔ engel sayısı aytUnlocks eksik sayısıyla tutarlı (0.28719ms)
+  ✔ müfredatta olmayan kapı konusunu bildirir (0.58448ms)
+✔ gateBlockers — kapıyı kapatan konular (1.74481ms)
+▶ gateBlockers — çoklu eksik alt konu
+  ✔ birden fazla eksik alt konunun HEPSİNİ listeler (207.455116ms)
+  ✔ bir alt konu öğrenildi, diğeri eksikse yalnızca eksik olanı gösterir (0.59604ms)
+  ✔ engel sayısı alt konu sayısından bağımsız: konu başına 1 (0.44492ms)
+  ✔ subtopics alanı geriye dönük alanları da doldurur (0.46253ms)
+✔ gateBlockers — çoklu eksik alt konu (209.203346ms)
+▶ stageFor
+  ✔ picks the band containing the coverage (0.84376ms)
+  ✔ clamps out-of-range coverage to the nearest band (0.16605ms)
+  ✔ increases frequency monotonically across bands (0.24338ms)
+  ✔ keeps AYT expectations lower than TYT at the same coverage (0.17759ms)
+✔ stageFor (2.91803ms)
+▶ rollingAverage
+  ✔ averages the last N exams, not just the last one (9.809089ms)
+  ✔ uses only the most recent window when more exams exist (0.26973ms)
+  ✔ ignores exams without a net (0.40616ms)
+  ✔ reports the trend across the window (0.42586ms)
+  ✔ returns null average when there is no data (1.72454ms)
+✔ rollingAverage (13.538289ms)
+▶ learningStage
+  ✔ treats 'Bitti' without question data as lecture-only (0.82298ms)
+  ✔ treats 'Bitti' with weak question performance as basic-practice (0.11633ms)
+  ✔ treats 'Bitti' with strong question performance as mastered (0.15977ms)
+  ✔ marks 'Tekrar Gerekli' regardless of question data (0.10904ms)
+  ✔ reports not-started correctly (0.16827ms)
+  ✔ sınır: 14/14 öğrenilmiş sayılmaz (soru sayısı yetersiz) (0.1096ms)
+  ✔ sınır: 14/20 öğrenilmiş sayılır (iki eşik de karşılanır) (1.00231ms)
+  ✔ sınır: 15/15 öğrenilmiş sayılır (tam başarı, sınırda soru sayısı) (0.14642ms)
+  ✔ sınır: 13/20 öğrenilmiş sayılmaz (başarı %65, eşik altı) (0.13995ms)
+  ✔ sınır: eşikler tam sınırda kapsayıcıdır (15 ve %70 dahil) (0.17883ms)
+✔ learningStage (4.35953ms)
+▶ weightedProgress
+  ✔ is zero when nothing is mastered (0.28579ms)
+  ✔ counts a heavy topic more than a light one (0.22494ms)
+  ✔ gives full progress only when everything is mastered (0.1545ms)
+  ✔ does not invent weights: falls back to equal weighting and reports it (0.1569ms)
+  ✔ credits lecture-only and review-needed partially (0.11966ms)
+✔ weightedProgress (1.26207ms)
+▶ mergeTopics — veri kaybı koruması
+  ✔ hiç kayıt yoksa tüm müfredatı üretir (0.9773ms)
+  ✔ kullanıcının çalışma alanlarını korur (0.27397ms)
+  ✔ müfredat değişse bile konu adını müfredattan alır (0.32535ms)
+  ✔ müfredatta olmayan kaydı sessizce düşürür (0.21377ms)
+  ✔ kayıt sayısı kadar konuyu eksiksiz döndürür (0.25213ms)
+✔ mergeTopics — veri kaybı koruması (1131.101017ms)
+ℹ tests 108
+ℹ suites 25
+ℹ pass 108
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1989.841079
+npm notice
+npm notice New major version of npm available! 11.21.0 -> 12.2.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+npm notice To update run: npm install -g npm@12.2.1
+npm notice
+EXIT=0
+
+================ npm-run-test-plan.log ================
+### npm run test:plan
+
+> test:plan
+> node --experimental-strip-types --test src/lib/smart/engine.plan.test.ts
+
+▶ planPace kapasite
+  ✔ 185 konuyu program penceresine sığdırır (4.2995ms)
+  ✔ günlük pratik konularını yeni konu saymaz (2.36937ms)
+  ✔ TYT tur 1 hedefine yetişecek tempoyu hesaplar (2.13636ms)
+  ✔ pazar ve deneme günlerini kapasiteden düşer (2.01036ms)
+  ✔ günde en az 1 yeni konu planlar (1.9224ms)
+✔ planPace kapasite (975.45526ms)
+▶ program gerçekten ilerliyor
+  ✔ ilk 30 günün her hafta içi gününde en az bir yeni konu açar (1038.072688ms)
+  ✔ program boyunca konuların tamamına yakınını açar (7930.515708ms)
+  ✔ AYT'yi TYT bitmeden başlatır (kapı mantığı) (7925.007868ms)
+  ✔ son konuyu sınavdan önce bitirir (7880.538828ms)
+✔ program gerçekten ilerliyor (24774.602762ms)
+▶ zayıf konu önceliği
+  ✔ yanlış birikmiş bir konuyu hiç başlanmamış konuların gerisine atmaz (12.81453ms)
+  ✔ zayıf konuya 'kritik' ve 'yanlış birikmiş' gerekçesi yazar (12.521679ms)
+✔ zayıf konu önceliği (25.533389ms)
+ℹ tests 11
+ℹ suites 3
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 26004.243388
+EXIT=0
+
+================ npx-tsc---noEmit.log ================
+### npx tsc --noEmit
+EXIT=0
+
+================ npm-run-lint.log ================
+### npm run lint
+
+> lint
+> eslint .
+
+EXIT=0
+
+================ npm-run-build.log ================
+### npm run build
+
+> build
+> node scripts/with-app-env.mjs vite build && npm run db:migrate
+
+[nitro:vercel] ℹ Using nodejs24.x runtime.
+[nitro:vercel] ℹ Using web entry format.
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 2476 modules transformed.
+rendering chunks...
+computing gzip size...
+.vercel/output/static/assets/styles-u02tjWno.css                    36.14 kB │ gzip:   7.44 kB
+.vercel/output/static/assets/plus-ZVwdIfC3.js                        0.14 kB │ gzip:   0.14 kB
+.vercel/output/static/assets/BarChart-DLscprB6.js                    0.31 kB │ gzip:   0.22 kB
+.vercel/output/static/assets/trash-2-Baw4aqPG.js                     0.34 kB │ gzip:   0.24 kB
+.vercel/output/static/assets/badge-DQWJwxpU.js                       0.69 kB │ gzip:   0.38 kB
+.vercel/output/static/assets/input-BeCoFSBC.js                       0.77 kB │ gzip:   0.40 kB
+.vercel/output/static/assets/kpi-BBbLtSQZ.js                         0.84 kB │ gzip:   0.45 kB
+.vercel/output/static/assets/button-BDUTzNwR.js                      1.48 kB │ gzip:   0.79 kB
+.vercel/output/static/assets/tekrarlar-BciU3Umt.js                   3.22 kB │ gzip:   1.19 kB
+.vercel/output/static/assets/istatistikler-stc99Dwj.js               3.46 kB │ gzip:   1.16 kB
+.vercel/output/static/assets/gunluk-C6MSAMHt.js                      3.75 kB │ gzip:   1.25 kB
+.vercel/output/static/assets/yanlislar-nk7AnnFI.js                   4.08 kB │ gzip:   1.20 kB
+.vercel/output/static/assets/konular-Cy6hz8Fq.js                     5.51 kB │ gzip:   1.83 kB
+.vercel/output/static/assets/LineChart-C71PaCFd.js                  10.97 kB │ gzip:   4.18 kB
+.vercel/output/static/assets/dagilim-6U9-6bKw.js                    11.77 kB │ gzip:   3.00 kB
+.vercel/output/static/assets/denemeler-KzeQuGmN.js                  12.74 kB │ gzip:   3.51 kB
+.vercel/output/static/assets/program-COEEyGRI.js                    19.83 kB │ gzip:   5.28 kB
+.vercel/output/static/assets/routes-d3IfFRfw.js                     47.61 kB │ gzip:  13.23 kB
+.vercel/output/static/assets/generateCategoricalChart-BIhmDV-d.js  369.66 kB │ gzip:  98.20 kB
+.vercel/output/static/assets/index-B83-bOMy.js                     540.19 kB │ gzip: 166.22 kB
+
+✓ built in 1.35s
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+vite v8.2.2 building ssr environment for production...
+transforming...
+✓ 108 modules transformed.
+rendering chunks...
+computing gzip size...
+node_modules/.nitro/vite/services/ssr/assets/styles-u02tjWno.css                      36.14 kB │ gzip:  7.44 kB
+node_modules/.nitro/vite/services/ssr/assets/start-5Z2QO8AU.js                         0.14 kB │ gzip:  0.13 kB
+node_modules/.nitro/vite/services/ssr/assets/empty-plugin-adapters-D9UWiqvJ.js         0.22 kB │ gzip:  0.16 kB
+node_modules/.nitro/vite/services/ssr/assets/badge-C_X1x16-.js                         1.04 kB │ gzip:  0.51 kB
+node_modules/.nitro/vite/services/ssr/assets/input-DpojlDp0.js                         1.04 kB │ gzip:  0.51 kB
+node_modules/.nitro/vite/services/ssr/assets/kpi-CuvRxISA.js                           1.17 kB │ gzip:  0.59 kB
+node_modules/.nitro/vite/services/ssr/assets/button-Bd0P0qbT.js                        1.20 kB │ gzip:  0.64 kB
+node_modules/.nitro/vite/services/ssr/assets/ai-comment-CFYdRJnc.js                    2.02 kB │ gzip:  1.14 kB
+node_modules/.nitro/vite/services/ssr/assets/_tanstack-start-manifest_v-DOsmaQUG.js    2.99 kB │ gzip:  0.71 kB
+node_modules/.nitro/vite/services/ssr/assets/tekrarlar-Df4P1eQw.js                     5.14 kB │ gzip:  1.63 kB
+node_modules/.nitro/vite/services/ssr/assets/istatistikler-C8tgoAUP.js                 5.42 kB │ gzip:  1.52 kB
+node_modules/.nitro/vite/services/ssr/assets/gunluk-JjvFNdAd.js                        6.52 kB │ gzip:  1.62 kB
+node_modules/.nitro/vite/services/ssr/assets/yanlislar-DFrSysaw.js                     6.84 kB │ gzip:  1.54 kB
+node_modules/.nitro/vite/services/ssr/assets/konular-DsMgMmWs.js                       9.39 kB │ gzip:  2.39 kB
+node_modules/.nitro/vite/services/ssr/assets/dagilim-DQnnYnRG.js                      18.90 kB │ gzip:  4.12 kB
+node_modules/.nitro/vite/services/ssr/assets/denemeler-DLGPW7-U.js                    22.76 kB │ gzip:  4.95 kB
+node_modules/.nitro/vite/services/ssr/assets/routes-C4rTfrSM.js                       29.53 kB │ gzip:  6.43 kB
+node_modules/.nitro/vite/services/ssr/assets/program-BdQrwkal.js                      31.95 kB │ gzip:  6.76 kB
+node_modules/.nitro/vite/services/ssr/assets/roadmap-B3Z7SVOL.js                      61.48 kB │ gzip: 13.32 kB
+node_modules/.nitro/vite/services/ssr/index.js                                        76.18 kB │ gzip: 19.30 kB
+node_modules/.nitro/vite/services/ssr/assets/router-CyrzafQJ.js                      105.29 kB │ gzip: 28.66 kB
+
+✓ built in 531ms
+
+[nitro] ◐ Building [Nitro] (preset: vercel, compatibility: 2026-11-01)
+[nitro] ✔ Generated public .vercel/output/static
+vite v8.2.2 building nitro environment for production...
+transforming...
+✓ 2482 modules transformed.
+rendering chunks...
+computing gzip size...
+.vercel/output/functions/__server.func/_ssr/start-5Z2QO8AU.mjs                    0.14 kB │ gzip:   0.13 kB
+.vercel/output/functions/__server.func/_ssr/empty-plugin-adapters-D9UWiqvJ.mjs    0.23 kB │ gzip:   0.16 kB
+.vercel/output/functions/__server.func/_chunks/ssr-renderer.mjs                   0.96 kB │ gzip:   0.49 kB
+.vercel/output/functions/__server.func/_ssr/input-DpojlDp0.mjs                    1.19 kB │ gzip:   0.54 kB
+.vercel/output/functions/__server.func/_ssr/badge-C_X1x16-.mjs                    1.24 kB │ gzip:   0.58 kB
+.vercel/output/functions/__server.func/_ssr/button-Bd0P0qbT.mjs                   1.35 kB │ gzip:   0.68 kB
+.vercel/output/functions/__server.func/_ssr/kpi-CuvRxISA.mjs                      1.44 kB │ gzip:   0.66 kB
+.vercel/output/functions/__server.func/_runtime.mjs                               1.58 kB │ gzip:   0.74 kB
+.vercel/output/functions/__server.func/_libs/react-is.mjs                         1.67 kB │ gzip:   0.65 kB
+.vercel/output/functions/__server.func/_ssr/ai-comment-CFYdRJnc.mjs               1.95 kB │ gzip:   1.12 kB
+.vercel/output/functions/__server.func/_libs/prop-types.mjs                       2.27 kB │ gzip:   0.84 kB
+.vercel/output/functions/__server.func/_tanstack-start-manifest_v-DOsmaQUG.mjs    3.05 kB │ gzip:   0.75 kB
+.vercel/output/functions/__server.func/_libs/class-variance-authority+clsx.mjs    3.17 kB │ gzip:   1.24 kB
+.vercel/output/functions/__server.func/_libs/d3-path.mjs                          3.25 kB │ gzip:   1.16 kB
+.vercel/output/functions/__server.func/_libs/d3-interpolate.mjs                   5.03 kB │ gzip:   1.61 kB
+.vercel/output/functions/__server.func/_ssr/tekrarlar-Df4P1eQw.mjs                5.92 kB │ gzip:   1.69 kB
+.vercel/output/functions/__server.func/_ssr/istatistikler-C8tgoAUP.mjs            6.50 kB │ gzip:   1.61 kB
+.vercel/output/functions/__server.func/_libs/zustand.mjs                          6.71 kB │ gzip:   2.08 kB
+.vercel/output/functions/__server.func/_ssr/gunluk-JjvFNdAd.mjs                   7.77 kB │ gzip:   1.70 kB
+.vercel/output/functions/__server.func/_libs/d3-array.mjs                         8.06 kB │ gzip:   2.25 kB
+.vercel/output/functions/__server.func/_ssr/yanlislar-DFrSysaw.mjs                8.16 kB │ gzip:   1.61 kB
+.vercel/output/functions/__server.func/_libs/eventemitter3.mjs                    8.31 kB │ gzip:   2.05 kB
+.vercel/output/functions/__server.func/_libs/h3-v2+rou3.mjs                       9.83 kB │ gzip:   3.05 kB
+.vercel/output/functions/__server.func/_libs/d3-color.mjs                        10.38 kB │ gzip:   3.57 kB
+.vercel/output/functions/__server.func/_libs/d3-format.mjs                       10.56 kB │ gzip:   3.02 kB
+.vercel/output/functions/__server.func/_ssr/konular-DsMgMmWs.mjs                 10.96 kB │ gzip:   2.50 kB
+.vercel/output/functions/__server.func/_libs/lucide-react.mjs                    11.16 kB │ gzip:   2.73 kB
+.vercel/output/functions/__server.func/_libs/tanstack__history.mjs               12.33 kB │ gzip:   3.66 kB
+.vercel/output/functions/__server.func/_libs/fast-equals.mjs                     14.37 kB │ gzip:   3.62 kB
+.vercel/output/functions/__server.func/_ssr/dagilim-DQnnYnRG.mjs                 22.17 kB │ gzip:   4.27 kB
+.vercel/output/functions/__server.func/_libs/h3+rou3+srvx.mjs                    22.57 kB │ gzip:   6.12 kB
+.vercel/output/functions/__server.func/_libs/decimal.js-light.mjs                23.31 kB │ gzip:   6.89 kB
+.vercel/output/functions/__server.func/_libs/d3-shape.mjs                        24.60 kB │ gzip:   5.02 kB
+.vercel/output/functions/__server.func/_ssr/denemeler-DLGPW7-U.mjs               25.53 kB │ gzip:   5.03 kB
+.vercel/output/functions/__server.func/_libs/@tanstack/router-core+[...].mjs     29.71 kB │ gzip:   7.98 kB
+.vercel/output/functions/__server.func/index.mjs                                 32.22 kB │ gzip:  10.02 kB
+.vercel/output/functions/__server.func/_ssr/routes-C4rTfrSM.mjs                  34.16 kB │ gzip:   6.52 kB
+.vercel/output/functions/__server.func/_ssr/program-BdQrwkal.mjs                 36.50 kB │ gzip:   6.93 kB
+.vercel/output/functions/__server.func/_libs/react-smooth.mjs                    37.85 kB │ gzip:   8.15 kB
+.vercel/output/functions/__server.func/_libs/d3-scale+[...].mjs                  58.23 kB │ gzip:  12.12 kB
+.vercel/output/functions/__server.func/_ssr/ssr.mjs                              74.40 kB │ gzip:  19.22 kB
+.vercel/output/functions/__server.func/_libs/tailwind-merge.mjs                  88.13 kB │ gzip:  15.66 kB
+.vercel/output/functions/__server.func/_libs/lodash.mjs                         163.89 kB │ gzip:  29.67 kB
+.vercel/output/functions/__server.func/_ssr/router-CyrzafQJ.mjs                 166.17 kB │ gzip:  41.14 kB
+.vercel/output/functions/__server.func/_libs/zod.mjs                            168.68 kB │ gzip:  37.70 kB
+.vercel/output/functions/__server.func/_libs/recharts+[...].mjs                 570.21 kB │ gzip: 105.73 kB
+.vercel/output/functions/__server.func/_libs/@tanstack/react-router+[...].mjs   787.79 kB │ gzip: 168.80 kB
+
+✓ built in 406ms
+ℹ Generated .vercel/output/nitro.json
+
+[nitro] ✔ You can preview this build using npx vite preview
+[nitro] ✔ You can deploy this build using npx nitro deploy --prebuilt
+
+> db:migrate
+> node scripts/migrate.mjs
+
+[migrate] DATABASE_URL not set — skipping (the PGLite fallback migrates itself).
+EXIT=0
+
+================ MUTASYON KANITI (gecici, sonra geri alindi) ================
+▶ explainStage — learningStage ile tutarlılık
+  ✔ mastered alanı her girdide learningStage ile aynı (1.25275ms)
+  ✔ eşikler tek kaynaktan gelir ve beklenen değerlerdir (0.18045ms)
+  ✔ 14/14 için başarı yeterli ama soru yetersiz mesajı verir (0.25357ms)
+  ✔ 15/15 için öğrenildi mesajı verir (0.15873ms)
+  ✔ 13/20 için başarı düşük mesajı verir (0.1481ms)
+  ✔ soru verisi olmayan 'Bitti' konuyu anlatım aşamasında bırakır (0.13896ms)
+✔ explainStage — learningStage ile tutarlılık (844.278903ms)
+▶ explainStage — 'Tekrar Gerekli' açıklaması
+  ✖ 'Tekrar Gerekli' için 'tamamlanmadı' DEMEZ, tekrar gerekçesi verir (0.87718ms)
+  ✔ soru ve başarı yeterli olsa bile 'Tekrar Gerekli' öğrenildi sayılmaz (0.16416ms)
+  ✖ 'Tekrar Gerekli' + yetersiz soru: her iki gerekçe de doğru yazılır (3.23645ms)
+  ✖ soru verisi olmayan 'Tekrar Gerekli' de 'tamamlanmadı' demez (0.47989ms)
+  ✔ 'Başlamadım' hâlâ 'tamamlanmadı' der (regresyon koruması) (0.10286ms)
+  ✔ 'Çalışıyorum' hâlâ 'tamamlanmadı' der (regresyon koruması) (0.10886ms)
+✖ explainStage — 'Tekrar Gerekli' açıklaması (5.4376ms)
+▶ gateBlockers — kapıyı kapatan konular
+  ✔ kapı açıkken hiç engel döndürmez (0.36561ms)
+  ✔ eksik konuları adlarıyla ve gerekçesiyle listeler (0.28046ms)
+  ✔ engel sayısı aytUnlocks eksik sayısıyla tutarlı (0.31928ms)
+  ✔ müfredatta olmayan kapı konusunu bildirir (0.61411ms)
+✔ gateBlockers — kapıyı kapatan konular (1.81596ms)
+▶ gateBlockers — çoklu eksik alt konu
+  ✖ birden fazla eksik alt konunun HEPSİNİ listeler (137.062977ms)
+  ✖ bir alt konu öğrenildi, diğeri eksikse yalnızca eksik olanı gösterir (0.81699ms)
+  ✔ engel sayısı alt konu sayısından bağımsız: konu başına 1 (0.35361ms)
+  ✔ subtopics alanı geriye dönük alanları da doldurur (0.46596ms)
+✖ gateBlockers — çoklu eksik alt konu (138.903917ms)
+ℹ tests 20
+ℹ suites 4
+ℹ pass 15
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1254.382064
+
+✖ failing tests:
+
+test at src/lib/smart/explain.test.ts:94:3
+✖ 'Tekrar Gerekli' için 'tamamlanmadı' DEMEZ, tekrar gerekçesi verir (0.87718ms)
+  AssertionError [ERR_ASSERTION]: yanlış gerekçe: ["konu tamamlandı olarak işaretlenmedi"]
+      at TestContext.<anonymous> (file:///workspace/project/app/src/lib/smart/explain.test.ts:98:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at node:internal/test_runner/test:1903:71
+      at node:internal/per_context/primordials:504:82
+      at new Promise (<anonymous>)
+      at new SafePromise (node:internal/per_context/primordials:478:3)
+      at node:internal/per_context/primordials:504:9
+      at Array.map (<anonymous>) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at src/lib/smart/explain.test.ts:118:3
+✖ 'Tekrar Gerekli' + yetersiz soru: her iki gerekçe de doğru yazılır (3.23645ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(ex.missing.some((m        ) => m.includes("tekrar")))
+  
+      at TestContext.<anonymous> (file:///workspace/project/app/src/lib/smart/explain.test.ts:120:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Suite.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at src/lib/smart/explain.test.ts:126:3
+✖ soru verisi olmayan 'Tekrar Gerekli' de 'tamamlanmadı' demez (0.47989ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(!ex.missing.some((m        ) => m.includes("tamamlan")))
+  
+      at TestContext.<anonymous> (file:///workspace/project/app/src/lib/smart/explain.test.ts:128:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Suite.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at src/lib/smart/explain.test.ts:201:3
+✖ birden fazla eksik alt konunun HEPSİNİ listeler (137.062977ms)
+  AssertionError [ERR_ASSERTION]: beklenen 4 alt konu, gelen 1
+  
+  1 !== 4
+  
+      at TestContext.<anonymous> (file:///workspace/project/app/src/lib/smart/explain.test.ts:219:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1905:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 4,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/smart/explain.test.ts:235:3
+✖ bir alt konu öğrenildi, diğeri eksikse yalnızca eksik olanı gösterir (0.81699ms)
+  AssertionError [ERR_ASSERTION]: yalnızca eksik alt konular listelenmeli
+  
+  1 !== 3
+  
+      at TestContext.<anonymous> (file:///workspace/project/app/src/lib/smart/explain.test.ts:252:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 3,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+================ MUTASYON GERI ALINDIKTAN SONRA ================
+tests 20 / pass 20 / fail 0

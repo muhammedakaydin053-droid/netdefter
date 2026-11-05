@@ -1,0 +1,161 @@
+/**
+ * Persist migrasyonu testleri — takvim 3 gün ileri kaydırma.
+ *
+ * `migratePersistedState`, eski kayıtlı durumdaki `programStart: "2026-11-01"`
+ * değerini yeni varsayılana ("2026-11-04") taşır. Kritik sınır: kullanıcının
+ * ELLE ayarladığı başka bir tarihe dokunulmamalı ve kullanıcı verisi
+ * (konular, yanlışlar, denemeler, arşiv, diğer ayarlar) hiç değişmemeli.
+ *
+ * `vite` ile yüklenir çünkü store `@/` takma adı ve JSON importu kullanır.
+ */
+import { describe, it, before, after } from "node:test";
+import assert from "node:assert/strict";
+import { createServer, type ViteDevServer } from "vite";
+
+let server: ViteDevServer;
+let S: any;
+
+/** Eski (v0) kayıtlı durum: takvim kaydırmasından önceki varsayılan başlangıç. */
+function legacyState(over: Record<string, unknown> = {}) {
+  return {
+    topics: [
+      { id: "TYT|Matematik|Temel Kavramlar|Sayı kümeleri", exam: "TYT", subject: "Matematik",
+        topic: "Temel Kavramlar", subtopic: "Sayı kümeleri", status: "Bitti", total: 40,
+        correct: 34, wrong: 6, lastStudy: "2026-10-30", reviewDate: "2026-11-06",
+        source: "MEB", note: "kullanıcı-notu" },
+    ],
+    archivedTopics: [
+      { id: "TYT|Eski Ders|Kaldırılmış Konu|Alt", exam: "TYT", subject: "Eski Ders",
+        topic: "Kaldırılmış Konu", subtopic: "Alt", status: "Bitti", total: 25, correct: 20,
+        wrong: 5, lastStudy: "2026-09-15", reviewDate: "", source: "X", note: "arşiv-notu" },
+    ],
+    wrongs: [{ id: "w1", date: "2026-10-28", exam: "TYT", subject: "Matematik",
+      topic: "Temel Kavramlar", subtopic: "Sayı kümeleri", source: "3D", questionNo: "12",
+      reason: "Dikkat hatası", note: "", reviewDate: "", result: "" }],
+    tytExams: [{ id: "t1", date: "2026-10-20", name: "D1", turD: 20, turY: 5, matD: 18, matY: 7,
+      sosD: 15, sosY: 5, fenD: 12, fenY: 8, note: "" }],
+    aytExams: [{ id: "a1", date: "2026-10-21", name: "A1", matD: 15, matY: 5, fizD: 10, fizY: 4,
+      kimD: 8, kimY: 2, bioD: 9, bioY: 1, note: "zor" }],
+    daily: [{ id: "d1", date: "2026-10-29", subject: "Matematik", topic: "Türev",
+      kind: "Soru çözümü", minutes: 60, questions: 30, correct: 25, wrong: 5, note: "" }],
+    settings: { programStart: "2026-11-01", examDate: "2027-06-19", studyMinutes: 240, weeklyHours: 26 },
+    carry: [{ id: "c1", title: "Kaçırılan gün", minutes: 240, created: "2026-11-01" }],
+    ...over,
+  };
+}
+
+before(async () => {
+  server = await createServer({ server: { middlewareMode: true }, logLevel: "silent" });
+  S = await server.ssrLoadModule("/src/lib/store.ts");
+});
+
+after(async () => {
+  await server?.close();
+});
+
+describe("migratePersistedState — eski programStart taşınır", () => {
+  it("(1) eski varsayılan '2026-11-01' -> yeni varsayılan '2026-11-04'", () => {
+    const out: any = S.migratePersistedState(legacyState(), 0);
+    assert.equal(out.settings.programStart, "2026-11-04");
+  });
+
+  it("(2) sürüm PERSIST_VERSION'a eşitse dokunulmaz (tek seferlik)", () => {
+    const out: any = S.migratePersistedState(legacyState(), S.PERSIST_VERSION);
+    assert.equal(out.settings.programStart, "2026-11-01", "yeni sürümde migrasyon çalıştı");
+  });
+
+  it("(3) idempotent: ikinci kez çağrılınca sonuç değişmez", () => {
+    const once: any = S.migratePersistedState(legacyState(), 0);
+    const twice: any = S.migratePersistedState(once, 0);
+    assert.equal(twice.settings.programStart, "2026-11-04");
+    assert.deepEqual(twice.settings, once.settings);
+  });
+
+  it("(4) sabitler doğru değerleri taşır", () => {
+    assert.equal(S.LEGACY_PROGRAM_START, "2026-11-01");
+    assert.equal(S.MIGRATED_PROGRAM_START, "2026-11-04");
+    assert.equal(S.PERSIST_VERSION, 1);
+  });
+});
+
+describe("migratePersistedState — elle ayarlanan tarihe dokunmaz", () => {
+  it("(5) farklı bir programStart korunur", () => {
+    const out: any = S.migratePersistedState(legacyState({ settings: { programStart: "2026-12-01" } }), 0);
+    assert.equal(out.settings.programStart, "2026-12-01", "elle ayarlanan tarih bozuldu");
+  });
+
+  it("(6) yeni varsayılan zaten ayarlıysa aynen kalır", () => {
+    const out: any = S.migratePersistedState(legacyState({ settings: { programStart: "2026-11-04" } }), 0);
+    assert.equal(out.settings.programStart, "2026-11-04");
+  });
+
+  it("(7) programStart yoksa hata vermez, diğer ayarlar korunur", () => {
+    const out: any = S.migratePersistedState(legacyState({ settings: { examDate: "2027-06-19", studyMinutes: 300 } }), 0);
+    assert.equal(out.settings.programStart, undefined);
+    assert.equal(out.settings.examDate, "2027-06-19");
+    assert.equal(out.settings.studyMinutes, 300);
+  });
+});
+
+describe("migratePersistedState — kullanıcı verisi değişmez", () => {
+  it("(8) konular, yanlışlar, denemeler, günlük, arşiv, carry aynen korunur", () => {
+    const src = legacyState();
+    const out: any = S.migratePersistedState(src, 0);
+    assert.deepEqual(out.topics, src.topics);
+    assert.deepEqual(out.wrongs, src.wrongs);
+    assert.deepEqual(out.tytExams, src.tytExams);
+    assert.deepEqual(out.aytExams, src.aytExams);
+    assert.deepEqual(out.daily, src.daily);
+    assert.deepEqual(out.archivedTopics, src.archivedTopics);
+    assert.deepEqual(out.carry, src.carry);
+  });
+
+  it("(9) diğer ayar alanları (examDate, studyMinutes) korunur", () => {
+    const src = legacyState();
+    const out: any = S.migratePersistedState(src, 0);
+    assert.equal(out.settings.examDate, src.settings.examDate);
+    assert.equal(out.settings.studyMinutes, src.settings.studyMinutes);
+    assert.equal(out.settings.weeklyHours, src.settings.weeklyHours);
+  });
+
+  it("(10) girdi mutasyona uğramaz (kaynak nesne değişmez)", () => {
+    const src = legacyState();
+    const snapshotBefore = JSON.stringify(src);
+    S.migratePersistedState(src, 0);
+    assert.equal(JSON.stringify(src), snapshotBefore, "girdi mutasyona uğradı");
+    assert.equal(src.settings.programStart, "2026-11-01", "kaynak nesnenin değeri değişti");
+  });
+
+  it("(11) boş / null / bozuk girdi güvenle ele alınır", () => {
+    assert.doesNotThrow(() => S.migratePersistedState(undefined, 0));
+    assert.doesNotThrow(() => S.migratePersistedState(null, 0));
+    assert.doesNotThrow(() => S.migratePersistedState("metin", 0));
+    assert.doesNotThrow(() => S.migratePersistedState({ settings: null }, 0));
+    assert.doesNotThrow(() => S.migratePersistedState({ settings: "x" }, 0));
+  });
+});
+
+describe("migratePersistedState + merge — gerçek akış", () => {
+  it("(12) migrasyon sonrası varsayılanlarla birleşince programStart 2026-11-04 olur", async () => {
+    const D = (await server.ssrLoadModule("/src/lib/smart/types.ts")).DEFAULT_SETTINGS;
+    const migrated: any = S.migratePersistedState(legacyState(), 0);
+    // store.ts içindeki merge ile aynı kural:
+    const mergedSettings = { ...D, ...migrated.settings };
+    assert.equal(mergedSettings.programStart, "2026-11-04");
+    assert.equal(mergedSettings.examDate, "2027-06-19");
+  });
+
+  it("(13) migrasyon kullanıcı konusunu koruyup planlamaya doğru verir", () => {
+    // Gerçek bir müfredat kimliği kullanılır; aksi hâlde mergeTopicsWithArchive
+    // kaydı (doğru biçimde) arşive taşır ve aktif listede bulunamaz.
+    const real = S.seedTopics()[0];
+    const saved = { ...real, status: "Bitti", total: 40, correct: 34, wrong: 6, note: "kullanıcı-notu" };
+    const migrated: any = S.migratePersistedState(legacyState({ topics: [saved] }), 0);
+    const merged = S.mergeTopicsWithArchive(migrated.topics, migrated.archivedTopics);
+    const live = merged.topics.find((t: any) => t.id === real.id);
+    assert.ok(live, "kullanıcı konusu aktif listede bulunamadı");
+    assert.equal(live.total, 40, "kullanıcı verisi kayboldu");
+    assert.equal(live.note, "kullanıcı-notu");
+    assert.equal(merged.archivedTopics.length, 1, "arşiv kayboldu");
+  });
+});

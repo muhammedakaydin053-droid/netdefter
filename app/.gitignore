@@ -1,0 +1,22 @@
+node_modules/
+.node_modules.lock
+.vercel/
+.tanstack/
+.nitro/
+dist/
+.output/
+*.log
+
+# yerel ortam / sırlar
+.env
+.env.*
+!.env.example
+
+# üretilmiş önizleme ve ekran görüntüleri
+screenshots/
+artifacts/
+attachments/
+
+# editör / işletim sistemi
+.DS_Store
+__pycache__/

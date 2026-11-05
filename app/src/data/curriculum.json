@@ -1,0 +1,1700 @@
+[
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Sözcükte Anlam",
+    "subtopic": "Gerçek, mecaz ve terim anlam"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Sözcükte Anlam",
+    "subtopic": "Eş anlam, zıt anlam, eş seslilik"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Sözcükte Anlam",
+    "subtopic": "Deyimler ve atasözleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Sözcükte Anlam",
+    "subtopic": "Söz yorumu"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Sözcük Grupları",
+    "subtopic": "Söz öbekleri, deyim aktarmaları, ikilemeler"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Cümlede Anlam",
+    "subtopic": "Cümle yorumu"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Cümlede Anlam",
+    "subtopic": "Anlatım özellikleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Cümlede Anlam",
+    "subtopic": "Anlam ilişkileri (neden-sonuç, amaç, koşul)"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Paragraf",
+    "subtopic": "Konu ve ana düşünce"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Paragraf",
+    "subtopic": "Yardımcı düşünce"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Paragraf",
+    "subtopic": "Paragrafta yapı"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Paragraf",
+    "subtopic": "Anlatım teknikleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Paragraf",
+    "subtopic": "Düşünceyi geliştirme yolları"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Ses Bilgisi",
+    "subtopic": "Ünlü ve ünsüz olayları"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Ses Bilgisi",
+    "subtopic": "Hece bilgisi"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Yazım Kuralları",
+    "subtopic": "Büyük harf, birleşik kelimeler, kısaltmalar"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Noktalama İşaretleri",
+    "subtopic": "Nokta, virgül, noktalı virgül ve diğerleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Sözcükte Yapı",
+    "subtopic": "Kök, gövde, yapım ve çekim ekleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Sözcük Türleri",
+    "subtopic": "İsimler"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Sözcük Türleri",
+    "subtopic": "Zamirler"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Sözcük Türleri",
+    "subtopic": "Sıfatlar"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Sözcük Türleri",
+    "subtopic": "Zarflar"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Sözcük Türleri",
+    "subtopic": "Edat, bağlaç, ünlem"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Fiiller",
+    "subtopic": "Kip, kişi ve yapı"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Fiiller",
+    "subtopic": "Ek fiil"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Fiiller",
+    "subtopic": "Fiilimsi"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Fiiller",
+    "subtopic": "Fiilde çatı"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Cümle Bilgisi",
+    "subtopic": "Cümlenin ögeleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Cümle Bilgisi",
+    "subtopic": "Cümle türleri (yapısına göre)"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Cümle Bilgisi",
+    "subtopic": "Anlatım bozukluğu"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Sözel Mantık",
+    "subtopic": "Tablo ve grafik"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Türkçe",
+    "topic": "Sözel Mantık",
+    "subtopic": "Akıl yürütme"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Temel Kavramlar",
+    "subtopic": "Sayı kümeleri, işlem özellikleri, aralık"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Sayı Basamakları",
+    "subtopic": "Basamak ve rakam değeri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Bölme ve Bölünebilme",
+    "subtopic": "Bölme, kalan, bölünebilme kuralları"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "EBOB – EKOK",
+    "subtopic": "EBOB, EKOK ve problemleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Rasyonel Sayılar",
+    "subtopic": "Kesirler, ondalık gösterim, işlemler"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Basit Eşitsizlikler",
+    "subtopic": "Birinci dereceden eşitsizlikler"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Mutlak Değer",
+    "subtopic": "Mutlak değer denklem ve eşitsizlikleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Üslü Sayılar",
+    "subtopic": "Üs kuralları ve denklemler"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Köklü Sayılar",
+    "subtopic": "Kök kuralları, iç içe kökler"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Çarpanlara Ayırma",
+    "subtopic": "Özdeşlikler, çarpanlara ayırma"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Oran – Orantı",
+    "subtopic": "Oran, doğru ve ters orantı"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Denklem Çözme",
+    "subtopic": "Birinci dereceden denklemler"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Problemler",
+    "subtopic": "Sayı problemleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Problemler",
+    "subtopic": "Kesir problemleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Problemler",
+    "subtopic": "Yaş problemleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Problemler",
+    "subtopic": "Hareket ve hız"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Problemler",
+    "subtopic": "İşçi ve emek"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Problemler",
+    "subtopic": "Yüzde problemleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Problemler",
+    "subtopic": "Kar – zarar"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Problemler",
+    "subtopic": "Karışım"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Problemler",
+    "subtopic": "Grafik ve tablo"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Problemler",
+    "subtopic": "Rutin olmayan problemler"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Kümeler",
+    "subtopic": "Küme işlemleri, kartezyen çarpım"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Mantık",
+    "subtopic": "Önermeler, niceleyiciler"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Fonksiyonlar",
+    "subtopic": "Fonksiyon kavramı, değer, tanım kümesi"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Polinomlar",
+    "subtopic": "Polinom işlemleri, çarpanlara ayırma"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "2. Dereceden Denklemler",
+    "subtopic": "Kökler, diskriminant"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Permütasyon – Kombinasyon",
+    "subtopic": "Sıralama ve seçme"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Olasılık",
+    "subtopic": "Basit olayların olasılığı"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Veri ve İstatistik",
+    "subtopic": "Merkezi eğilim, grafik okuma"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Temel Kavramlar",
+    "subtopic": "Nokta, doğru, düzlem, ışın, doğru parçası"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Doğruda Açılar",
+    "subtopic": "Açılar, paralel doğrular, yöndeş-ters açılar"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Üçgende Açılar",
+    "subtopic": "İç ve dış açılar, açı bağıntıları"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Özel Üçgenler",
+    "subtopic": "Dik üçgen"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Özel Üçgenler",
+    "subtopic": "İkizkenar üçgen"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Özel Üçgenler",
+    "subtopic": "Eşkenar üçgen"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Açıortay",
+    "subtopic": "İç ve dış açıortay"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Kenarortay",
+    "subtopic": "Kenarortay, ağırlık merkezi"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Eşlik ve Benzerlik",
+    "subtopic": "Üçgende eşlik ve benzerlik"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Üçgende Alan",
+    "subtopic": "Alan bağıntıları"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Açı – Kenar Bağıntıları",
+    "subtopic": "Pisagor, Öklid, dik üçgen bağıntıları"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Çokgenler",
+    "subtopic": "İç-dış açı, düzgün çokgen"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Özel Dörtgenler",
+    "subtopic": "Paralelkenar"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Özel Dörtgenler",
+    "subtopic": "Dikdörtgen ve kare"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Özel Dörtgenler",
+    "subtopic": "Eşkenar dörtgen ve deltoid"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Özel Dörtgenler",
+    "subtopic": "Yamuk"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Çember ve Daire",
+    "subtopic": "Çemberde açı"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Çember ve Daire",
+    "subtopic": "Çemberde uzunluk"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Çember ve Daire",
+    "subtopic": "Dairede çevre ve alan"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Analitik Geometri",
+    "subtopic": "Noktanın analitiği"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Analitik Geometri",
+    "subtopic": "Doğrunun analitiği"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Katı Cisimler",
+    "subtopic": "Prizma ve küp"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Katı Cisimler",
+    "subtopic": "Silindir"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Katı Cisimler",
+    "subtopic": "Piramit ve koni"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Geometri",
+    "topic": "Katı Cisimler",
+    "subtopic": "Küre"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Fizik Bilimine Giriş",
+    "subtopic": "Bilimsel yöntem, birimler, vektörel-skaler"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Madde ve Özellikleri",
+    "subtopic": "Kütle, hacim, özkütle"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Madde ve Özellikleri",
+    "subtopic": "Dayanıklılık, adezyon, kohezyon, yüzey gerilimi"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Hareket ve Kuvvet",
+    "subtopic": "Konum, yer değiştirme, sürat, hız"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Hareket ve Kuvvet",
+    "subtopic": "Kuvvet, denge, Newton yasaları"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "İş, Güç ve Enerji",
+    "subtopic": "İş, güç, kinetik-potansiyel enerji, verim"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Isı ve Sıcaklık",
+    "subtopic": "Isı, sıcaklık, genleşme"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Isı ve Sıcaklık",
+    "subtopic": "Hal değişimi, ısı alışverişi"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Elektrostatik",
+    "subtopic": "Yük, Coulomb yasası, elektrik alan"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Elektrik ve Manyetizma",
+    "subtopic": "Akım, potansiyel fark, direnç, Ohm yasası"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Elektrik ve Manyetizma",
+    "subtopic": "Manyetik alan ve elektromıknatıs"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Basınç ve Kaldırma Kuvveti",
+    "subtopic": "Katı, sıvı ve gaz basıncı"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Basınç ve Kaldırma Kuvveti",
+    "subtopic": "Kaldırma kuvveti"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Dalgalar",
+    "subtopic": "Dalga türleri, yay, su ve ses dalgaları"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Optik",
+    "subtopic": "Aydınlanma ve gölge"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Optik",
+    "subtopic": "Yansıma, düzlem ve küresel aynalar"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Optik",
+    "subtopic": "Kırılma, mercekler, renk"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Kimya",
+    "topic": "Kimya Bilimi",
+    "subtopic": "Kimyanın alt dalları, laboratuvar güvenliği"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Kimya",
+    "topic": "Atom ve Periyodik Sistem",
+    "subtopic": "Atomun yapısı ve modeller"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Kimya",
+    "topic": "Atom ve Periyodik Sistem",
+    "subtopic": "Periyodik sistem ve periyodik özellikler"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Kimya",
+    "topic": "Kimyasal Türler Arası Etkileşimler",
+    "subtopic": "Güçlü etkileşimler (iyonik, kovalent, metalik)"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Kimya",
+    "topic": "Kimyasal Türler Arası Etkileşimler",
+    "subtopic": "Zayıf etkileşimler (hidrojen bağı, van der Waals)"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Kimya",
+    "topic": "Maddenin Halleri",
+    "subtopic": "Katı, sıvı, gaz ve plazma"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Kimya",
+    "topic": "Doğa ve Kimya",
+    "subtopic": "Su ve hayat, doğal kimyasallar"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Kimya",
+    "topic": "Kimyanın Temel Kanunları",
+    "subtopic": "Kütlenin korunumu, sabit ve katlı oranlar"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Kimya",
+    "topic": "Mol ve Kimyasal Hesaplamalar",
+    "subtopic": "Mol, Avogadro sayısı, mol kütlesi"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Kimya",
+    "topic": "Mol ve Kimyasal Hesaplamalar",
+    "subtopic": "Tepkime denklemleri, verim"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Kimya",
+    "topic": "Karışımlar",
+    "subtopic": "Homojen-heterojen karışımlar, çözeltiler, derişim"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Kimya",
+    "topic": "Asit, Baz ve Tuz",
+    "subtopic": "Asit-baz teorileri, pH, tuzlar"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Kimya",
+    "topic": "Kimya Her Yerde",
+    "subtopic": "Polimerler, sabun-deterjan, ilaçlar"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Biyoloji",
+    "topic": "Canlıların Ortak Özellikleri",
+    "subtopic": "Ortak özellikler ve sınıflandırma ilkesi"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Biyoloji",
+    "topic": "Canlıların Temel Bileşenleri",
+    "subtopic": "İnorganik bileşikler (su, mineraller)"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Biyoloji",
+    "topic": "Canlıların Temel Bileşenleri",
+    "subtopic": "Karbonhidratlar ve yağlar"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Biyoloji",
+    "topic": "Canlıların Temel Bileşenleri",
+    "subtopic": "Proteinler, enzimler, nükleik asitler, vitaminler"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Biyoloji",
+    "topic": "Hücre",
+    "subtopic": "Hücre teorisi, prokaryot ve ökaryot"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Biyoloji",
+    "topic": "Hücre",
+    "subtopic": "Organeller"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Biyoloji",
+    "topic": "Hücre",
+    "subtopic": "Hücre zarından madde geçişi"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Biyoloji",
+    "topic": "Canlıların Sınıflandırılması",
+    "subtopic": "Sınıflandırma basamakları, hayvanlar alemi"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Biyoloji",
+    "topic": "Hücre Bölünmeleri",
+    "subtopic": "Mitoz ve eşeysiz üreme"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Biyoloji",
+    "topic": "Hücre Bölünmeleri",
+    "subtopic": "Mayoz ve eşeyli üreme"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Biyoloji",
+    "topic": "Kalıtım",
+    "subtopic": "Mendel ilkeleri, tek ve dihibrit çaprazlama"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Biyoloji",
+    "topic": "Ekosistem Ekolojisi",
+    "subtopic": "Besin zinciri, enerji akışı, madde döngüleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Biyoloji",
+    "topic": "Güncel Çevre Sorunları",
+    "subtopic": "Kirlilik, iklim, biyoçeşitlilik"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Tarih ve Zaman",
+    "subtopic": "Tarih bilimi, takvim, kronoloji"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "İnsanlığın İlk Dönemleri",
+    "subtopic": "Tarih öncesi ve ilk uygarlıklar"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Orta Çağ'da Dünya",
+    "subtopic": "Orta Çağ'da siyasi ve sosyal yapılar"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Orta Çağ'da Dünya",
+    "subtopic": "Orta Çağ'da tarım ve ticaret"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Orta Çağ'da Dünya",
+    "subtopic": "Orta Çağ'da askerî organizasyon ve yaşam tarzları"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Orta Çağ'da Dünya",
+    "subtopic": "İlk Çağ'ın sonlarından itibaren hukuki düzenlemeler"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "İlk ve Orta Çağlarda Türk Dünyası",
+    "subtopic": "Orta Asya Türk devletleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "İlk ve Orta Çağlarda Türk Dünyası",
+    "subtopic": "Göktürk, Uygur ve diğerleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "İslam Tarihi",
+    "subtopic": "İslam medeniyetinin doğuşu"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "İslam Tarihi",
+    "subtopic": "İlk İslam devletleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Türk-İslam Devletleri",
+    "subtopic": "Türklerin İslamiyet'i kabulü"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Türk-İslam Devletleri",
+    "subtopic": "Karahanlı, Gazneli, Büyük Selçuklu"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Selçuklu Türkiyesi",
+    "subtopic": "Anadolu'nun Türkleşmesi, Türkiye Selçukluları"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Osmanlı Kuruluş ve Yükselme",
+    "subtopic": "Beylikten devlete"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Osmanlı Kuruluş ve Yükselme",
+    "subtopic": "Dünya gücü Osmanlı"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Osmanlı Yönetim ve Toplum",
+    "subtopic": "Merkez teşkilatı, timar, millet sistemi"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Osmanlı Yönetim ve Toplum",
+    "subtopic": "Klasik çağda toplum ve kültür"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Osmanlı'da Değişim",
+    "subtopic": "Gerileme dönemi siyaseti"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Osmanlı'da Değişim",
+    "subtopic": "Islahatlar ve Tanzimat"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "XX. Yüzyıl Başları",
+    "subtopic": "Osmanlı'nın son dönemi, I. Dünya Savaşı"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Milli Mücadele",
+    "subtopic": "Mondros'tan Lozan'a"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Atatürkçülük ve İnkılap",
+    "subtopic": "İnkılaplar, Atatürk ilkeleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Doğa ve İnsan",
+    "subtopic": "Coğrafyanın konuları, coğrafi bakış"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Dünya'nın Şekli ve Hareketleri",
+    "subtopic": "Şekil, günlük ve yıllık hareket"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Coğrafi Konum",
+    "subtopic": "Mutlak ve göreceli konum, Türkiye'nin konumu"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Harita Bilgisi",
+    "subtopic": "Ölçek, projeksiyon, izohips"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Atmosfer ve İklim",
+    "subtopic": "Atmosfer, sıcaklık, basınç, rüzgar, nem"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Atmosfer ve İklim",
+    "subtopic": "İklim tipleri, Türkiye iklimi"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Yerin Yapısı",
+    "subtopic": "İç kuvvetler, levha tektoniği, deprem"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Yerin Yapısı",
+    "subtopic": "Dış kuvvetler, kayaçlar"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Türkiye'nin Yer Şekilleri",
+    "subtopic": "Dağlar, ovalar, platolar, kıyılar"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Su, Toprak ve Bitki",
+    "subtopic": "Akarsu, göl, yeraltı suyu, toprak, bitki örtüsü"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Nüfus ve Yerleşme",
+    "subtopic": "Dünya ve Türkiye nüfusu, yerleşme"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Göç",
+    "subtopic": "Göç türleri, nedenleri, sonuçları"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Ekonomik Faaliyetler",
+    "subtopic": "Tarım, hayvancılık, ormancılık"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Ekonomik Faaliyetler",
+    "subtopic": "Sanayi, enerji, turizm, ulaşım"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Bölgeler",
+    "subtopic": "Coğrafi bölgeler, bölgesel kalkınma"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Çevre ve Afetler",
+    "subtopic": "Doğal afetler, çevre sorunları"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Felsefe",
+    "topic": "Felsefenin Konusu",
+    "subtopic": "Felsefi düşünce, felsefenin alanları"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Felsefe",
+    "topic": "Bilgi Felsefesi",
+    "subtopic": "Bilginin imkânı, kaynağı, doğruluk"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Felsefe",
+    "topic": "Varlık Felsefesi",
+    "subtopic": "Varlık, madde-idealizm, ontoloji"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Felsefe",
+    "topic": "Ahlak Felsefesi",
+    "subtopic": "Erdem, ödev, mutluluk, özgürlük"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Felsefe",
+    "topic": "Sanat Felsefesi",
+    "subtopic": "Güzel, estetik yargı"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Felsefe",
+    "topic": "Din Felsefesi",
+    "subtopic": "Tanrı, inanç, din-felsefe ilişkisi"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Felsefe",
+    "topic": "Siyaset Felsefesi",
+    "subtopic": "Devlet, adalet, özgürlük, sözleşme"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Felsefe",
+    "topic": "Bilim Felsefesi",
+    "subtopic": "Bilimsel yöntem, sınır, değer"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Din Kültürü",
+    "topic": "Bilgi ve İnanç",
+    "subtopic": "İman esasları, inanç-bilgi ilişkisi"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Din Kültürü",
+    "topic": "Din ve İslam",
+    "subtopic": "Dinin tanımı, İslam'ın temel özellikleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Din Kültürü",
+    "topic": "İslam ve İbadet",
+    "subtopic": "İbadetler, namaz, oruç, zekât, hac"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Din Kültürü",
+    "topic": "Hz. Muhammed",
+    "subtopic": "Örnekliği, ahlakı, sünnet"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Din Kültürü",
+    "topic": "Gençlik ve Değerler",
+    "subtopic": "Ahlaki tutumlar, helal-haram"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Din Kültürü",
+    "topic": "İslam Düşüncesinde Yorumlar",
+    "subtopic": "Mezhepler, yorum gelenekleri"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Din Kültürü",
+    "topic": "Din ve Laiklik",
+    "subtopic": "Laiklik, din-devlet, din özgürlüğü"
+  },
+  {
+    "exam": "TYT",
+    "subject": "Din Kültürü",
+    "topic": "Dinler ve Evrensel Öğretiler",
+    "subtopic": "Yaşayan dinler, ortak değerler"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Mantık",
+    "subtopic": "Önermeler, bileşik önermeler, niceleyiciler"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Kümeler",
+    "subtopic": "Küme işlemleri, kartezyen çarpım, sayı kümeleri"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Fonksiyonlar",
+    "subtopic": "Fonksiyon kavramı ve türleri"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Fonksiyonlar",
+    "subtopic": "Bileşke ve ters fonksiyon"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Fonksiyonlar",
+    "subtopic": "Fonksiyonlarda dönüşümler"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Polinomlar",
+    "subtopic": "Polinom işlemleri"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Polinomlar",
+    "subtopic": "Çarpanlara ayırma, kökler"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "2. Dereceden Denklemler",
+    "subtopic": "Kök-katsayı ilişkileri, diskriminant"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "2. Dereceden Fonksiyonlar",
+    "subtopic": "Parabol, tepe noktası, grafik"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Eşitsizlikler ve Sistemler",
+    "subtopic": "2. dereceden eşitsizlikler"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Eşitsizlikler ve Sistemler",
+    "subtopic": "Denklem ve eşitsizlik sistemleri"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Karmaşık Sayılar",
+    "subtopic": "Tanım, sanal birim, eşlenik"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Trigonometri",
+    "subtopic": "Yönlü açılar, trigonometrik fonksiyonlar"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Trigonometri",
+    "subtopic": "Toplam-fark ve iki kat açı"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Trigonometri",
+    "subtopic": "Trigonometrik denklemler"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Üstel Fonksiyonlar",
+    "subtopic": "Üstel fonksiyon, denklem ve eşitsizlik"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Logaritma",
+    "subtopic": "Logaritma tanımı, denklem ve eşitsizlik"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Diziler",
+    "subtopic": "Dizi kavramı, aritmetik ve geometrik dizi"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Limit ve Süreklilik",
+    "subtopic": "Limit kavramı, soldan-sağdan limit, süreklilik"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Türev",
+    "subtopic": "Türev tanımı, polinomsal fonksiyonların türevi"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Türev",
+    "subtopic": "Türev uygulamaları (artan-azalan, ekstremum)"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "İntegral",
+    "subtopic": "Belirsiz integral (polinomsal)"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "İntegral",
+    "subtopic": "Belirli integral ve alan"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Permütasyon – Kombinasyon",
+    "subtopic": "Sıralama, seçme, binom açılımı"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Olasılık",
+    "subtopic": "Koşullu olasılık, bağımlı-bağımsız olaylar"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "İstatistik",
+    "subtopic": "Merkezi eğilim ve yayılım ölçüleri"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Geometri",
+    "topic": "Üçgenler",
+    "subtopic": "Eşlik"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Geometri",
+    "topic": "Üçgenler",
+    "subtopic": "Benzerlik"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Geometri",
+    "topic": "Üçgenler",
+    "subtopic": "Yardımcı elemanlar (açıortay, kenarortay, yükseklik)"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Geometri",
+    "topic": "Üçgenler",
+    "subtopic": "Üçgende alan"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Geometri",
+    "topic": "Üçgenler",
+    "subtopic": "Dik üçgen ve trigonometrik bağıntılar"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Geometri",
+    "topic": "Çokgenler",
+    "subtopic": "İç-dış açı, düzgün çokgen"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Geometri",
+    "topic": "Özel Dörtgenler",
+    "subtopic": "Paralelkenar, dikdörtgen, kare"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Geometri",
+    "topic": "Özel Dörtgenler",
+    "subtopic": "Eşkenar dörtgen, deltoid, yamuk"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Geometri",
+    "topic": "Çember ve Daire",
+    "subtopic": "Çemberde açılar"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Geometri",
+    "topic": "Çember ve Daire",
+    "subtopic": "Teğet ve kiriş"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Geometri",
+    "topic": "Çember ve Daire",
+    "subtopic": "Dairenin çevresi ve alanı"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Geometri",
+    "topic": "Analitik Geometri",
+    "subtopic": "Doğrunun analitik incelenmesi"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Geometri",
+    "topic": "Analitik Geometri",
+    "subtopic": "Çemberin analitiği"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Geometri",
+    "topic": "Dönüşümler",
+    "subtopic": "Öteleme, yansıma, dönme"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Geometri",
+    "topic": "Katı Cisimler",
+    "subtopic": "Prizma, küp, silindir"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Geometri",
+    "topic": "Katı Cisimler",
+    "subtopic": "Piramit, koni, küre"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "Vektörler",
+    "subtopic": "Vektör işlemleri, bileşenler"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "Bağıl Hareket",
+    "subtopic": "Bağıl hız, bağıl ivme"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "Newton Yasaları",
+    "subtopic": "Dinamik, sürtünme, bağlı cisimler"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "Hareket",
+    "subtopic": "Bir boyutta sabit ivmeli hareket"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "Hareket",
+    "subtopic": "Atışlar (yatay, eğik, dikey)"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "İş, Güç, Enerji",
+    "subtopic": "İş-enerji teoremi, korunum, güç"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "İtme ve Momentum",
+    "subtopic": "İtme, momentum korunumu, çarpışmalar"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "Tork ve Denge",
+    "subtopic": "Tork, ağırlık merkezi, denge şartları"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "Çembersel Hareket",
+    "subtopic": "Düzgün çembersel hareket, merkezcil kuvvet"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "Kütle Çekim",
+    "subtopic": "Newton kütle çekim, Kepler, uydular"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "Basit Harmonik Hareket",
+    "subtopic": "Yaylı sistem, basit sarkaç, enerji"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "Dalga Mekaniği",
+    "subtopic": "Girişim, kırınım, Doppler, standing wave"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "Elektrik Alan",
+    "subtopic": "Coulomb, alan, potansiyel, sığaçlar"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "Manyetik Alan",
+    "subtopic": "Akımın manyetik alanı, Lorentz kuvveti"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "İndüksiyon ve Alternatif Akım",
+    "subtopic": "İndüksiyon, Faraday, Lenz"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "İndüksiyon ve Alternatif Akım",
+    "subtopic": "Transformatör, alternatör, AA devreleri"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "Atom Fiziği",
+    "subtopic": "Atom modelleri, spektrum, foton"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "Modern Fizik",
+    "subtopic": "Fotoelektrik olay, özel göreliliğe giriş"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Modern Atom Teorisi",
+    "subtopic": "Kuantum sayıları, orbitaller"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Modern Atom Teorisi",
+    "subtopic": "Elektron dizilimi, periyodik özellikler"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Gazlar",
+    "subtopic": "İdeal gaz yasası, gaz karışımları, kinetik teori"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Sıvılar ve Katılar",
+    "subtopic": "Buhar basıncı, faz diyagramı, katı türleri"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Sıvı Çözeltiler",
+    "subtopic": "Derişim birimleri"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Sıvı Çözeltiler",
+    "subtopic": "Çözünürlük, koligatif özellikler"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Kimyasal Tepkimelerde Enerji",
+    "subtopic": "Entalpi, Hess yasası, oluşum entalpisi"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Kimyasal Tepkimelerde Hız",
+    "subtopic": "Hız yasası, hızı etkileyen faktörler"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Kimyasal Denge",
+    "subtopic": "Denge sabiti, Le Chatelier"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Çözünürlük Dengesi",
+    "subtopic": "Kçç, ortak iyon"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Asit-Baz Dengesi",
+    "subtopic": "Kuvvetli-zayıf asit/baz, pH, tampon (hidroliz hesabı yok)"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Kimya ve Elektrik",
+    "subtopic": "Redoks, elektrot potansiyeli"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Kimya ve Elektrik",
+    "subtopic": "Elektroliz, Faraday yasaları"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Organik Kimyaya Giriş",
+    "subtopic": "Karbon kimyası, hibritleşme, izomeri (optik izomeri hariç)"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Organik Kimyaya Giriş",
+    "subtopic": "Fonksiyonel gruplar"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Hidrokarbonlar",
+    "subtopic": "Alkan, alken, alkin, aromatikler"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Organik Bileşikler",
+    "subtopic": "Alkoller ve eterler"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Organik Bileşikler",
+    "subtopic": "Aldehitler ve ketonlar"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Organik Bileşikler",
+    "subtopic": "Karboksilli asitler"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Enerji Kaynakları",
+    "subtopic": "Fosil yakıtlar, yenilenebilir enerji, nükleer"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Sinir Sistemi",
+    "subtopic": "Nöron, merkezi ve çevresel sinir sistemi"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Endokrin Sistem",
+    "subtopic": "Hormonlar, bezler, geri bildirim"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Duyu Organları",
+    "subtopic": "Göz, kulak, deri, tat, koku"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Destek ve Hareket",
+    "subtopic": "İskelet, kas, eklem"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Sindirim Sistemi",
+    "subtopic": "Sindirim organları, enzimler, karaciğer"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Dolaşım ve Bağışıklık",
+    "subtopic": "Kalp, damar, kan"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Dolaşım ve Bağışıklık",
+    "subtopic": "Lenf, bağışıklık"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Solunum Sistemi",
+    "subtopic": "Solunum organları, gaz alışverişi"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Boşaltım Sistemi",
+    "subtopic": "Böbrek, nefron, osmoregülasyon"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Üreme ve Gelişim",
+    "subtopic": "Dişi-erkek üreme, döllenme, embriyonik gelişim"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Komünite Ekolojisi",
+    "subtopic": "Komünite, rekabet, simbiyoz, süksesyon"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Nükleik Asitler",
+    "subtopic": "DNA, RNA, nükleotit yapısı"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Genden Proteine",
+    "subtopic": "Replikasyon, transkripsiyon, translasyon"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Canlılık ve Enerji",
+    "subtopic": "ATP, metabolizma"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Canlılık ve Enerji",
+    "subtopic": "Fotosentez"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Canlılık ve Enerji",
+    "subtopic": "Hücresel solunum"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Bitki Biyolojisi",
+    "subtopic": "Bitkisel dokular ve organlar"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Bitki Biyolojisi",
+    "subtopic": "Madde taşınması"
+  },
+  {
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Bitki Biyolojisi",
+    "subtopic": "Bitkilerde eşeyli üreme"
+  }
+]

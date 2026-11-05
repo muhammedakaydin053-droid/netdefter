@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NetDefter — İnceleme Dosyası</title>
+    <style>
+      :root {
+        --bg: #faf7f2;
+        --surface: #ffffff;
+        --border: #e0d8cc;
+        --fg: #26221e;
+        --muted: #6b6560;
+        --accent: #1e4d4a;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #16181a;
+          --surface: #1e2124;
+          --border: #33383d;
+          --fg: #eceff1;
+          --muted: #9aa2a9;
+          --accent: #6fb3ad;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        line-height: 1.5;
+      }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        padding: 14px 20px;
+      }
+      .wrap { max-width: 1000px; margin: 0 auto; }
+      h1 { margin: 0 0 4px; font-size: 18px; }
+      .sub { margin: 0; color: var(--muted); font-size: 13px; }
+      .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+      button, a.btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 40px;
+        padding: 0 14px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--fg);
+      }
+      button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+      main { max-width: 1000px; margin: 0 auto; padding: 20px; }
+      pre {
+        margin: 0;
+        padding: 20px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      .note { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+      .ok { color: #1a7f5a; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <h1>NetDefter — Bağımsız İnceleme Dosyası</h1>
+        <p class="sub">
+          Bu metnin tamamını kopyalayıp başka bir yapay zekâya ver. Denetçi modele ne yapacağı
+          metnin içinde yazılı.
+        </p>
+        <div class="actions">
+          <button class="primary" id="copy">Tümünü kopyala</button>
+          <a class="btn" href="/INCELEME.md" download="INCELEME.md">Markdown olarak indir</a>
+          <a class="btn" href="/">Siteye dön</a>
+        </div>
+      </div>
+    </header>
+    <main>
+      <p class="note" id="status">Yükleniyor…</p>
+      <pre id="out"></pre>
+    </main>
+    <script>
+      const out = document.getElementById("out");
+      const status = document.getElementById("status");
+      const copyBtn = document.getElementById("copy");
+      let raw = "";
+
+      // fetch().text() her zaman UTF-8 çözer; dosya tarayıcıda doğrudan açılınca
+      // sunucu charset göndermediği için Türkçe karakterler bozuluyordu.
+      fetch("/INCELEME.md")
+        .then((r) => {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.text();
+        })
+        .then((t) => {
+          raw = t;
+          out.textContent = t;
+          status.textContent = "Hazır. " + t.length + " karakter.";
+          status.className = "note ok";
+        })
+        .catch((e) => {
+          status.textContent = "Dosya yüklenemedi: " + e.message;
+          status.className = "note";
+        });
+
+      copyBtn.addEventListener("click", async () => {
+        if (!raw) return;
+        try {
+          await navigator.clipboard.writeText(raw);
+          copyBtn.textContent = "Kopyalandı";
+          setTimeout(() => (copyBtn.textContent = "Tümünü kopyala"), 1800);
+        } catch {
+          const r = document.createRange();
+          r.selectNodeContents(out);
+          const sel = getSelection();
+          sel.removeAllRanges();
+          sel.addRange(r);
+          status.textContent = "Otomatik kopyalanamadı; metin seçildi, Ctrl+C ile kopyala.";
+        }
+      });
+    </script>
+  </body>
+</html>

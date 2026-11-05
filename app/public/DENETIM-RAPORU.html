@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NetDefter — Denetim Raporu</title>
+<style>
+:root{--bg:#faf7f2;--s:#fff;--b:#e0d8cc;--f:#26221e;--m:#6b6560;--a:#1e4d4a}
+@media(prefers-color-scheme:dark){:root{--bg:#16181a;--s:#1e2124;--b:#33383d;--f:#eceff1;--m:#9aa2a9;--a:#6fb3ad}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--f);font-family:ui-sans-serif,system-ui,"Segoe UI",sans-serif;line-height:1.5}
+header{position:sticky;top:0;z-index:2;background:var(--s);border-bottom:1px solid var(--b);padding:14px 20px}
+.wrap{max-width:1000px;margin:0 auto}h1{margin:0 0 4px;font-size:18px}.sub{margin:0;color:var(--m);font-size:13px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+button,a.btn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;border:1px solid var(--b);background:var(--s);color:var(--f)}
+button.p{background:var(--a);color:#fff;border-color:var(--a)}
+main{max-width:1000px;margin:0 auto;padding:20px}
+pre{margin:0;padding:20px;background:var(--s);border:1px solid var(--b);border-radius:12px;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6}
+.note{color:var(--m);font-size:13px;margin:0 0 12px}.ok{color:#1a7f5a;font-weight:600}
+</style></head><body>
+<header><div class="wrap"><h1>NetDefter — Bağımsız Denetim Raporu</h1>
+<p class="sub">Çalıştırılmış komutların gerçek çıktılarına dayanan denetim. Başka bir yapay zekânın bağımsız incelemesi için hazır.</p>
+<div class="actions">
+<button class="p" id="copy">Tümünü kopyala</button>
+<a class="btn" href="/netdefter-kaynak.zip" download>Kaynak kod (ZIP)</a>
+<a class="btn" href="/ZIP-icerigi.txt" download>ZIP içerik listesi</a>
+<a class="btn" href="/KANIT-loglari.txt" download>Ham kanıt logları</a>
+<a class="btn" href="/">Siteye dön</a>
+</div></div></header>
+<main><p class="note" id="st">Yükleniyor…</p><pre id="out"></pre></main>
+<script>
+const out=document.getElementById("out"),st=document.getElementById("st"),cb=document.getElementById("copy");let raw="";
+fetch("/DENETIM-RAPORU.md").then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.text()})
+.then(t=>{raw=t;out.textContent=t;st.textContent="Hazır. "+t.length+" karakter.";st.className="note ok";})
+.catch(e=>{st.textContent="Yüklenemedi: "+e.message;});
+cb.addEventListener("click",async()=>{if(!raw)return;try{await navigator.clipboard.writeText(raw);cb.textContent="Kopyalandı";setTimeout(()=>cb.textContent="Tümünü kopyala",1800);}catch{const r=document.createRange();r.selectNodeContents(out);const s=getSelection();s.removeAllRanges();s.addRange(r);st.textContent="Metin seçildi; Ctrl+C ile kopyala.";}});
+</script></body></html>
