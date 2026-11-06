@@ -779,10 +779,13 @@ export function buildDailyPlan(
     practiceSlots: sunday ? 0 : Math.max(1, Math.min(2, pace.perDay - 1)),
   });
   const used2 = new Set<string>();
-  // Sert sıra için "başlanmış" küme: bitmiş konular + bugün plana giren yeni konular.
-  // Böylece aynı gün ardışık iki konu alınabilir, ama sıra atlanamaz.
-  const started = new Set<string>(
-    topics.filter((t) => t.status !== "Başlamadım").map((t) => `${t.exam}|${t.subject}|${t.topic}`),
+  // Sert sıra için "tamamlanmış" küme. Kullanıcı kuralı: aynı derste önceki
+  // yeni konu BİTMEDEN (en az 15 soru + %70) sonraki yeni konuya geçilmez.
+  // Önceden bu küme "başlanmış" idi; bu yüzden bir konu anlatılır anlatılmaz
+  // aynı derste bir sonraki konu açılıyor ve ilk konunun pratiği haftalarca
+  // sarkıyordu. SRS tekrarları bu kuralın dışındadır (kendi geçişinde eklenir).
+  const completed = new Set<string>(
+    topics.filter((t) => t.status === "Bitti").map((t) => `${t.exam}|${t.subject}|${t.topic}`),
   );
   const addTask = (r: (typeof ranked)[number], kindOverride?: string): boolean => {
     if (tasks.length > (sunday ? 5 : 8)) return false;
@@ -798,7 +801,7 @@ export function buildDailyPlan(
     // Sert ön koşul: AYT kapısı kapalıysa konu hiç açılmaz (yumuşak ceza yeterli değil).
     if (isNew && !r.aytOpen) return false;
     // Sert sıra: ders içinde önceki konular başlamadan bu konu açılmaz.
-    if (isNew && !orderAllowed(r.exam, r.subject, r.topic, started)) return false;
+    if (isNew && !orderAllowed(r.exam, r.subject, r.topic, completed)) return false;
     // Tamamlanmış konuya yeni "Soru çözümü" görevi yazılmaz. Bitmiş konunun
     // bakımı tekrar (SRS) görevleriyle yapılır; yoksa aynı konu her gün
     // tekrar tekrar soru görevi alıp yeni konuların önünü kesiyordu.
@@ -814,7 +817,6 @@ export function buildDailyPlan(
       reason: r.reasons[0] || "Öncelik sırası",
     });
     used2.add(`${r.exam}|${r.subject}|${r.topic}`);
-    if (isNew) started.add(`${r.exam}|${r.subject}|${r.topic}`);
     return true;
   };
 
@@ -848,7 +850,7 @@ export function buildDailyPlan(
   // seçilir; aksi hâlde ders aylarca başlamıyordu.
   const aytQueues = orderedSubjects.map((subject) => {
     const list = aytBySubject.get(subject)!;
-    const first = list.find((r) => orderAllowed(r.exam, r.subject, r.topic, started));
+    const first = list.find((r) => orderAllowed(r.exam, r.subject, r.topic, completed));
     return first ? [first, ...list.filter((r) => r !== first)] : list;
   });
   const aytInterleaved: (typeof ranked)[number][] = [];
@@ -881,16 +883,30 @@ export function buildDailyPlan(
   const tytFirst: (typeof ranked)[number][] = [];
   for (const s of tytFresh) {
     const list = tytBySubject.get(s)!;
-    const first = list.find((r) => orderAllowed(r.exam, r.subject, r.topic, started));
+    const first = list.find((r) => orderAllowed(r.exam, r.subject, r.topic, completed));
     if (first) tytFirst.push(first);
   }
   const tytOrdered = [...tytFirst, ...tytCandidates.filter((r) => !tytFirst.includes(r))];
   const newCandidates = [...tytOrdered, ...aytInterleaved];
+  // Pratik bekleyen (anlatımı verilmiş, hiç soru çözülmemiş) konular. Hem yeni
+  // konu kısıtlaması (aşağıda) hem 1.5 geçişi bu listeyi kullanır. EN ESKİDEN
+  // yeniye (FIFO) sıralanır; aksi hâlde düşük skorlu uzun konular haftalarca
+  // pratik alamıyordu (ölçüm: 3 konu 16 gün bekledi).
+  const startedRows = ranked.filter((r) => r.status !== "Başlamadım");
+  const awaitingPractice = startedRows
+    .filter((r) => (r.total ?? 0) === 0)
+    .sort((a, b) => (a.lastStudy || "").localeCompare(b.lastStudy || ""));
+
   let newCount = 0;
   let tytNew = 0;
   let aytNew = 0;
+  // Pratik birikimi (backlog) varken yeni konu sayısı kısılır. Ölçüm: günde
+  // ~2 yeni konu açılıp gün ~6 göreve (~330 dk) sığdığı için anlatılan konuların
+  // pratiği haftalarca gecikiyordu (3 konu 16 gün bekledi). Birikim belirgin
+  // olduğunda yeni anlatım tamamen durur, birikim erir; sonra normale döner.
+  const newLimit = awaitingPractice.length >= 4 ? 0 : awaitingPractice.length >= 2 ? 1 : pace.perDay;
   for (const r of newCandidates) {
-    if (newCount >= pace.perDay) break;
+    if (newCount >= newLimit) break;
     const isTyt = r.exam === "TYT";
     if (isTyt && tytNew >= pace.tytPerDay) continue;
     if (!isTyt && aytNew >= pace.aytPerDay) continue;
@@ -899,6 +915,40 @@ export function buildDailyPlan(
       if (isTyt) tytNew += 1;
       else aytNew += 1;
     }
+  }
+
+  // 1.5 geçiş: ANLATIMI VERİLMİŞ ama henüz soru çözülmemiş konuların pratiği.
+  //
+  // Bu geçiş hem tekrarlardan hem de bugün anlatılan konunun aynı-gün pratiğinden
+  // ÖNCE gelir. Aksi hâlde taze bir konunun pratiği, daha önce anlatılmış bir
+  // konunun pratiğinin önüne geçiyor ve o konu haftalarca bekliyordu; ölçüm:
+  // Kimyanın Temel Kanunları 25.11.2026'da anlatıldı, pratiği 18.01.2027'de
+  // yapıldı (54 gün). Sıra FIFO'dur (en eski bekleyen önce); böylece her konu
+  // kesintisiz tamamlanır ve birikim (backlog) erir. SRS tekrarları kendi payını
+  // yine alır.
+  for (const r of awaitingPractice) addTask(r);
+
+  // 1.25 geçiş: KISA konuların pratiğini aynı gün tamamla.
+  //
+  // Kullanıcı kuralı: anlatım + soru çözümü günlük kapasiteye sığıyorsa kısa/
+  // orta konu aynı gün biter. Uzun konular (>=3 alt konu) ertesi güne taşar.
+  // Zorlama yoktur: kapasite yetmezse görev yerleştirme aşamasında düşer.
+  const lecturedToday = tasks.filter((t) => t.kind === "Konu anlatımı");
+  for (const lt of lecturedToday) {
+    const rows = topics.filter(
+      (t) => t.exam === lt.exam && t.subject === lt.subject && t.topic === lt.topic,
+    );
+    if (rows.length > 2) continue; // uzun konu: gerçek iş yükü gereği bölünür
+    tasks.push({
+      exam: lt.exam,
+      subject: lt.subject,
+      topic: lt.topic,
+      kind: "Soru çözümü",
+      targetQ: 18,
+      minutes: 55,
+      priority: "orta",
+      reason: "Kısa konu: anlatımla aynı gün tamamlanır",
+    });
   }
 
   // 2. geçiş: tekrarlar, kalan paya sığdığı kadar.
@@ -921,9 +971,9 @@ export function buildDailyPlan(
     reviewMinutes += mins;
   }
 
-  // 3. geçiş: başlanmış konuların soru çözümü ve eksik kapatma işleri.
-  for (const r of ranked) {
-    if (r.status === "Başlamadım") continue;
+  // 3. geçiş: kalan başlanmış konuların soru çözümü ve eksik kapatma işleri.
+  for (const r of startedRows) {
+    if ((r.total ?? 0) === 0) continue; // taze pratik 1.5 geçişte eklendi
     addTask(r);
   }
 

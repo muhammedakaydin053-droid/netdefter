@@ -401,3 +401,187 @@ describe("TYT ders kapsama garantisi", () => {
     assert.ok(start <= addDays(S.programStart, 7), `Kimya Bilimi çok geç: ${start}`);
   });
 });
+
+/**
+ * Konu çalışma sürekliliği.
+ *
+ * Regresyon: anlatımı verilen konunun pratiği öncelik kuyruğunda gerilere
+ * düşüyordu; Kimyanın Temel Kanunları 25.11.2026'da anlatılıp 18.01.2027'de
+ * bitiyordu (54 gün). Aşağıdaki testler konu bazında ilk ve son çalışma
+ * tarihleri arasındaki aralığın gereksiz yere uzamadığını doğrular.
+ */
+describe("konu sürekliliği", () => {
+  /** Motoru gün gün işletip konu bazında ilk/son çalışma ve bitiş tarihini toplar. */
+  function simulate(days: number) {
+    let topics = seed();
+    const first: Record<string, string> = {};
+    const lastWork: Record<string, string> = {};
+    const finished: Record<string, string> = {};
+    const lectures: Record<string, string> = {};
+    const practices: Record<string, string> = {};
+    let reviewCount = 0;
+    for (let i = 0; i < days; i++) {
+      const date = addDays(S.programStart, i);
+      const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
+      for (const sl of slots) {
+        if (!sl.exam || sl.kind === "Deneme" || sl.kind === "Yanlış analizi") continue;
+        const key = `${sl.exam}|${sl.subject}|${sl.topic}`;
+        first[key] ??= date;
+        lastWork[key] = date;
+        if (sl.kind === "Konu anlatımı") {
+          lectures[key] = date;
+          topics = topics.map((t) =>
+            t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic && t.status === "Başlamadım"
+              ? { ...t, status: "Çalışıyorum", lastStudy: date }
+              : t,
+          );
+        } else {
+          if (sl.kind === "Tekrar") reviewCount += 1;
+          if (sl.kind === "Soru çözümü") practices[key] = date;
+          topics = topics.map((t) => {
+            if (!(t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic)) return t;
+            if (t.status === "Başlamadım") return t;
+            const q = Math.max(15, sl.targetQ || 15);
+            const total = (t.total ?? 0) + q;
+            const correct = (t.correct ?? 0) + Math.round(q * 0.78);
+            const next = total >= 15 && correct / total >= 0.7 ? "Bitti" : t.status;
+            if (next === "Bitti" && t.status !== "Bitti") finished[key] = date;
+            return { ...t, total, correct, lastStudy: date, status: next };
+          });
+        }
+      }
+    }
+    return { first, lastWork, finished, lectures, practices, reviewCount, topics };
+  }
+
+  it("hiçbir konunun anlatım-bitiş aralığı 15 günü aşmaz", () => {
+    // Regresyon: Kimyanın Temel Kanunları 54 gün, Mol 54 gün, Coğrafya konuları
+    // 50+ gün açık kalıyordu. Kesintisiz akışta bu aralık kısa olmalı.
+    const { finished, first } = simulate(230);
+    const bad = Object.entries(finished)
+      .map(([k, d]) => ({ k, days: daysBetweenISO(first[k], d) }))
+      .filter((x) => x.days > 15)
+      .sort((a, b) => b.days - a.days);
+    assert.equal(
+      bad.length,
+      0,
+      `15 günü aşan konular: ${bad.slice(0, 5).map((x) => `${x.k} (${x.days}g)`).join(", ")}`,
+    );
+  });
+
+  it("anlatılan konunun pratiği en geç ertesi çalışma günü yapılır", () => {
+    // Regresyon: pratik görevleri listede en sonda olduğu için bütçe/slot
+    // dolunca düşüyor ve haftalarca erteleniyordu.
+    const { lectures, practices } = simulate(120);
+    const late = Object.entries(lectures)
+      .filter(([k]) => practices[k])
+      .map(([k, d]) => ({ k, gap: daysBetweenISO(d, practices[k]) }))
+      .filter((x) => x.gap > 3)
+      .sort((a, b) => b.gap - a.gap);
+    assert.equal(
+      late.length,
+      0,
+      `pratiği 3 günden fazla geciken konular: ${late.slice(0, 5).map((x) => `${x.k} (${x.gap}g)`).join(", ")}`,
+    );
+  });
+
+  it("kısa konular anlatımla aynı gün tamamlanır", () => {
+    // Kullanıcı kuralı: anlatım + soru çözümü kapasiteye sığıyorsa aynı gün biter.
+    const { lectures, practices } = simulate(120);
+    const sameDay = Object.entries(lectures).filter(([k, d]) => practices[k] === d);
+    assert.ok(
+      sameDay.length >= 40,
+      `aynı gün tamamlanan konu sayısı çok az: ${sameDay.length}`,
+    );
+  });
+
+  it("aynı derste önceki konu bitmeden yeni konuya geçilmez", () => {
+    // Kullanıcı kuralı 4: SRS tekrarları hariç, ders içi sıra korunur.
+    let topics = seed();
+    const violations: string[] = [];
+    for (let i = 0; i < 230; i++) {
+      const date = addDays(S.programStart, i);
+      const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
+      for (const sl of slots) {
+        if (sl.kind !== "Konu anlatımı") continue;
+        const inProgress = topics.filter(
+          (t) => t.exam === sl.exam && t.subject === sl.subject && t.status === "Çalışıyorum",
+        );
+        if (inProgress.length) violations.push(`${date} ${sl.subject}/${sl.topic}`);
+      }
+      for (const sl of slots) {
+        if (!sl.exam || sl.kind === "Deneme" || sl.kind === "Yanlış analizi") continue;
+        if (sl.kind === "Konu anlatımı") {
+          topics = topics.map((t) =>
+            t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic && t.status === "Başlamadım"
+              ? { ...t, status: "Çalışıyorum", lastStudy: date }
+              : t,
+          );
+        } else {
+          topics = topics.map((t) => {
+            if (!(t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic)) return t;
+            if (t.status === "Başlamadım") return t;
+            const q = Math.max(15, sl.targetQ || 15);
+            const total = (t.total ?? 0) + q;
+            const correct = (t.correct ?? 0) + Math.round(q * 0.78);
+            return { ...t, total, correct, lastStudy: date, status: total >= 15 && correct / total >= 0.7 ? "Bitti" : t.status };
+          });
+        }
+      }
+    }
+    assert.equal(
+      violations.length,
+      0,
+      `sıra ihlali: ${violations.slice(0, 5).join(", ")}`,
+    );
+  });
+
+  it("SRS tekrarları yapılmaya devam eder", () => {
+    // Süreklilik düzeltmesi tekrarları dışlamamalı.
+    const { reviewCount } = simulate(230);
+    assert.ok(reviewCount >= 30, `tekrar görevi sayısı çok az: ${reviewCount}`);
+  });
+});
+
+describe("TYT/AYT bitiş tarihleri", () => {
+  it("TYT ve AYT ilk turu hedef tarihlere sığar", () => {
+    let topics = seed();
+    const finished: Record<string, string> = {};
+    for (let i = 0; i < 230; i++) {
+      const date = addDays(S.programStart, i);
+      const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
+      for (const sl of slots) {
+        if (!sl.exam || sl.kind === "Deneme" || sl.kind === "Yanlış analizi") continue;
+        const key = `${sl.exam}|${sl.subject}|${sl.topic}`;
+        if (sl.kind === "Konu anlatımı") {
+          topics = topics.map((t) =>
+            t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic && t.status === "Başlamadım"
+              ? { ...t, status: "Çalışıyorum", lastStudy: date }
+              : t,
+          );
+        } else {
+          topics = topics.map((t) => {
+            if (!(t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic)) return t;
+            if (t.status === "Başlamadım") return t;
+            const q = Math.max(15, sl.targetQ || 15);
+            const total = (t.total ?? 0) + q;
+            const correct = (t.correct ?? 0) + Math.round(q * 0.78);
+            const next = total >= 15 && correct / total >= 0.7 ? "Bitti" : t.status;
+            if (next === "Bitti" && t.status !== "Bitti") finished[key] = date;
+            return { ...t, total, correct, lastStudy: date, status: next };
+          });
+        }
+      }
+    }
+    const lastOf = (prefix: string) =>
+      Object.entries(finished)
+        .filter(([k]) => k.startsWith(prefix))
+        .map(([, d]) => d)
+        .sort()
+        .at(-1)!;
+    const tytEnd = lastOf("TYT|");
+    const aytEnd = lastOf("AYT|");
+    assert.ok(tytEnd <= "2027-02-10", `TYT ilk tur çok geç: ${tytEnd}`);
+    assert.ok(aytEnd <= "2027-04-20", `AYT ilk tur çok geç: ${aytEnd}`);
+  });
+});
