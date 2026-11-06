@@ -531,7 +531,8 @@ export function planPace(topics: TopicRow[], settings: ScheduleSettings, today =
   // Kapasite dönemsel eğriden gelir; varsayılan 240 onu geçersiz kılamaz.
   const studyMinutes = dailyCapacity(from, settings.studyMinutes);
   const cap = capacity(teachWindow, studyMinutes);
-  const perDay = cap.teachDays > 0
+  // Talep tabanlı yeni konu sayısı (tüm müfredat sınav tarihine yetişsin diye).
+  const perDayBase = cap.teachDays > 0
     ? Math.min(cap.perDay, Math.max(1, Math.ceil(leftTopics / cap.teachDays)))
     : 0;
   // TYT yalnız: sınav öncesi bitiş tahmini. AYT kapıları kapalıyken öncelik TYT'de.
@@ -544,8 +545,6 @@ export function planPace(topics: TopicRow[], settings: ScheduleSettings, today =
     if (!rows.every((r) => r.status === "Bitti")) tytKeys.add(key);
   }
   const tytLeft = tytKeys.size;
-  const tytStudyDays = perDay > 0 ? Math.ceil(tytLeft / perDay) : 0;
-  const tytEta = tytStudyDays > 0 ? addDaysISO(from, Math.ceil((tytStudyDays * 7) / 6)) : from;
 
   // Hedef-farkındal tempo: TYT tur 1 hedefine (ilk fazın sonu) yetişmek için
   // TYT'nin günde kaç yeni konu alması gerektiği. AYT kapıları açılınca motor
@@ -565,32 +564,52 @@ export function planPace(topics: TopicRow[], settings: ScheduleSettings, today =
     })(),
   );
   const tytPerDayNeeded = tytLeft > 0 ? Math.min(cap.perDay, Math.max(1, Math.ceil(tytLeft / tytWindowDays))) : 0;
-  // AYT'ye ne zaman slot verilir?
+  // KADANS TABANI (ders sürekliliği).
   //
-  // Kullanıcı şartı: AYT dersleri kapı açıldıkça başlar (tek tarihte topluca değil).
-  // Ama TYT tur 1 hedefi (31 Ocak) önce gelir ve günlük kapasite sınırlı
-  // (240 dk → 2 slot). AYT'ye 1 slot vermek TYT'yi günde 1 konuya düşürüp
-  // hedefi kaçırır.
-  //
-  // Kural: AYT yalnızca TYT bu kayıpla yine hedefine yetişebiliyorsa slot alır.
-  // TYT geride kalıyorsa bütün slotlar TYT'ye gider; TYT öne geçince AYT açar.
+  // `perDay` tüm müfredatı Haziran'a yaydığı için son dönemde 1'e düşüyordu.
+  // Ama o dönemde ~15 TYT dersi hâlâ bekliyor; günde 1 yeni konu → her ders
+  // ~15 günde bir dönüyor ve boşluklar 15-20 güne çıkıyordu. Kapasite elverdiği
+  // ölçüde, bekleyen her TYT dersini ~10 günde bir dolaşacak bir taban koyuyoruz.
+  // Bu, yapay hızlandırma değil; günlük kapasitenin (480 dk) zaten karşıladığı,
+  // "dersler kopuk ilerlemesin" kuralının gerektirdiği bir alt sınırdır.
+  const pendingTytSubjects = new Set(
+    topics
+      .filter(
+        (t) =>
+          t.exam === "TYT" &&
+          !isOngoingTopic(t.exam, t.subject, t.topic) &&
+          t.status !== "Bitti",
+      )
+      .map((t) => t.subject),
+  ).size;
+  const cadenceFloor = Math.min(cap.perDay, Math.max(1, Math.ceil(pendingTytSubjects / 10)));
+  // AYT kapısı: en az bir AYT dersi hazır mı?
   const aytGateOpen = (() => {
     const u = aytUnlocks(topics);
     return u.mat.ready || u.fiz.ready || u.kim.ready || u.bio.ready;
   })();
   const aytLeft = leftTopics - tytLeft;
-  const tytPerDayWithAyt = Math.max(1, cap.perDay - 1);
-  const canAffordAyt = tytLeft <= tytPerDayWithAyt * tytWindowDays;
-  // TYT sürerken AYT'ye 1 slot; TYT bitince kalan kapasitenin tamamı AYT'ye
-  // geçer. Aksi hâlde AYT, TYT bittikten sonra da günde 1 konuyla sınırlı
-  // kalıyor ve ilk tur gereksiz yere uzuyordu.
+  // TYT'nin hedefine yetişmesi için gereken günlük pay (kadans tabanıyla).
+  const tytPerDayTarget = Math.min(cap.perDay, Math.max(tytPerDayNeeded, cadenceFloor));
+  // Günlük yeni konu sayısı. TYT sürerken: TYT hedefi + (AYT kapısı açıksa 1).
+  // Aksi hâlde TYT fazında AYT hiç başlamıyor ya da TYT hedefini kaçırıyordu.
+  // TYT bitince tüm kapasite AYT'ye geçer.
+  const perDay =
+    tytLeft > 0
+      ? Math.min(cap.perDay, Math.max(perDayBase, tytPerDayTarget + (aytGateOpen && aytLeft > 0 ? 1 : 0)))
+      : cap.perDay;
+  // TYT sürerken AYT'ye EN AZ 1 slot; TYT bitince kalan kapasitenin tamamı
+  // AYT'ye geçer. Kapı açıldığı andan itibaren AYT ilerler (kural: AYT başlayınca
+  // TYT durmaz, ama AYT de donmaz).
   const aytPerDay =
-    aytGateOpen && aytLeft > 0 && cap.perDay >= 2 && canAffordAyt
+    aytGateOpen && aytLeft > 0
       ? tytLeft > 0
-        ? Math.min(2, Math.max(1, cap.perDay - tytPerDayNeeded))
-        : Math.min(2, cap.perDay - 1)
+        ? Math.max(0, Math.min(2, perDay - tytPerDayTarget))
+        : Math.min(2, Math.max(1, perDay - 1))
       : 0;
-  const tytPerDay = Math.min(tytPerDayNeeded, Math.max(1, cap.perDay - aytPerDay));
+  const tytPerDay = tytLeft > 0 ? Math.max(1, Math.min(perDay, perDay - aytPerDay)) : 0;
+  const tytStudyDays = perDay > 0 ? Math.ceil(tytLeft / perDay) : 0;
+  const tytEta = tytStudyDays > 0 ? addDaysISO(from, Math.ceil((tytStudyDays * 7) / 6)) : from;
 
   // Hız senaryoları: günde kaç yeni konu hedeflenirse TYT ne zaman biter.
   const tytScenarios = [1, 2, 3].map((per) => {
@@ -864,29 +883,66 @@ export function buildDailyPlan(
       }
     }
   }
-  const tytCandidates = ranked.filter((r) => r.exam === "TYT" && r.status === "Başlamadım");
-  // TYT ders dengesi: hiç başlamamış dersler öne alınır, aksi hâlde 10 ders
-  // tek sıradan döndüğü için Türkçe/Matematik sırası gereği Coğrafya gibi
-  // dersler haftalarca beklemeden başlayamıyordu. Her dersin sıradaki
-  // (orderAllowed) konusu öne alınır; sonra kalan adaylar öncelik sırasına
-  // göre gelir. Böylece tüm TYT dersleri ilk haftalardan itibaren düzenli
-  // ilerler; hiçbir ders "aç kalarak" haftalarca beklemez.
+  const tytCandidates = ranked.filter(
+    (r) => r.exam === "TYT" && r.status === "Başlamadım" && !isOngoingTopic(r.exam, r.subject, r.topic),
+  );
+  // TYT ders dengesi: adaylar derslere göre gruplanır ve DÖNÜŞÜMLÜ serpiştirilir
+  // (aşağıda, ilerlemeye göre döndürülmüş round-robin).
+  //
+  // Önceden adaylar salt öncelik puanına göre sıralanıyordu; düşük frekanslı
+  // dersler (Coğrafya, Felsefe, Din Kültürü) haftalarca geriye düşüyordu. Ölçüm:
+  // Coğrafya ve Felsefe'de 45 gün, Matematik'te 57 gün yeni konu boşluğu vardı.
   const tytBySubject = new Map<string, (typeof ranked)[number][]>();
   for (const r of tytCandidates) {
     const list = tytBySubject.get(r.subject) ?? [];
     list.push(r);
     tytBySubject.set(r.subject, list);
   }
-  const tytFresh = [...tytBySubject.keys()].filter(
-    (s) => !topics.some((t) => t.exam === "TYT" && t.subject === s && t.status !== "Başlamadım"),
-  );
-  const tytFirst: (typeof ranked)[number][] = [];
-  for (const s of tytFresh) {
-    const list = tytBySubject.get(s)!;
+  // Dersin sıradaki (orderAllowed) konusu başa alınır; sert sıra yüzünden bloke
+  // bir konu dersin başında durup dersi aylarca kilitleyemez.
+  const tytQueues = new Map<string, (typeof ranked)[number][]>();
+  for (const subject of tytBySubject.keys()) {
+    const list = tytBySubject.get(subject)!;
     const first = list.find((r) => orderAllowed(r.exam, r.subject, r.topic, completed));
-    if (first) tytFirst.push(first);
+    tytQueues.set(subject, first ? [first, ...list.filter((r) => r !== first)] : list);
   }
-  const tytOrdered = [...tytFirst, ...tytCandidates.filter((r) => !tytFirst.includes(r))];
+  const tytOrdered: (typeof ranked)[number][] = [];
+  {
+    // İLERLEMEYE GÖRE DÖNDÜRÜLMÜŞ dönüşümlü (round-robin) dağıtım.
+    //
+    // Ders sırası sabittir (alfabetik) ama liste, o ana kadar BAŞLATILMIŞ TYT
+    // konu sayısına göre döndürülür. Böylece her gün kota listenin hep aynı
+    // başından alınmaz; rotasyon ilerlemeyle birlikte kayar ve her aktif ders
+    // sırayla hizmet alır.
+    //
+    // Dönüşüm (offset) olmadan "dalga" oluşuyordu: kısa konulu dersler hızlı
+    // tamamlanıp listede hep öne geçiyor, uzun konulu dersler (Matematik/Tarih)
+    // bloke kalıp 18-22 gün geriye düşüyordu. Offset, hizmeti ilerlemeye bağlar.
+    const stableOrder = [...tytBySubject.keys()].sort((a, b) => a.localeCompare(b, "tr"));
+    const rotation = stableOrder;
+    // O ana kadar BAŞLATILMIŞ TYT konu sayısı (ders başına değil, toplam).
+    const startedTotal = new Set(
+      topics
+        .filter((t) => t.exam === "TYT" && t.status !== "Başlamadım")
+        .map((t) => `${t.subject}|${t.topic}`),
+    ).size;
+    const offset = startedTotal % Math.max(1, rotation.length);
+    const rotated = [...rotation.slice(offset), ...rotation.slice(0, offset)];
+    const queues = new Map<string, (typeof ranked)[number][]>(
+      stableOrder.map((s) => [s, [...(tytQueues.get(s) ?? [])]]),
+    );
+    for (let more = true; more; ) {
+      more = false;
+      for (const s of rotated) {
+        const queue = queues.get(s)!;
+        const next = queue.shift();
+        if (next) {
+          tytOrdered.push(next);
+          more = true;
+        }
+      }
+    }
+  }
   const newCandidates = [...tytOrdered, ...aytInterleaved];
   // Pratik bekleyen (anlatımı verilmiş, hiç soru çözülmemiş) konular. Hem yeni
   // konu kısıtlaması (aşağıda) hem 1.5 geçişi bu listeyi kullanır. EN ESKİDEN
