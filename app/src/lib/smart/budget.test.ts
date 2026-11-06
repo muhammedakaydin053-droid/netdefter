@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { splitBudget, slotsPerDay, capacity, type DayLoad } from "./budget.ts";
+import { splitBudget, slotsPerDay, capacity, dailyCapacity, type DayLoad } from "./budget.ts";
 import { DEFAULT_SETTINGS } from "./types.ts";
 
 // Kapasitenin karşılaması gereken konu sayısı müfredattan okunur; elle yazılan
@@ -143,5 +143,37 @@ describe("capacity", () => {
     const cap = capacity([{ isSunday: true, isMock: false }], 240);
     assert.equal(cap.teachDays, 0);
     assert.equal(cap.capacity, 0);
+  });
+});
+
+describe("dailyCapacity — dönemsel kapasite eğrisi", () => {
+  it("Kasım 330, Aralık 390, Ocak+ 480 döner", () => {
+    assert.equal(dailyCapacity("2026-11-05", 240), 330);
+    assert.equal(dailyCapacity("2026-12-15", 240), 390);
+    assert.equal(dailyCapacity("2027-01-10", 240), 480);
+    assert.equal(dailyCapacity("2027-05-20", 240), 480);
+  });
+
+  it("varsayılan 240 eğriyi geçersiz kılamaz (yüksek dönem korunur)", () => {
+    assert.equal(dailyCapacity("2027-01-10", 240), 480);
+    assert.equal(dailyCapacity("2027-01-10", 300), 480);
+  });
+
+  it("eğri kapsamı dışında ve daha büyük varsayımda varsayımı korur", () => {
+    assert.equal(dailyCapacity("2026-10-01", 240), 240);
+    assert.equal(dailyCapacity("2027-01-10", 600), 600);
+  });
+});
+
+describe("splitBudget — pratik payı", () => {
+  it("practiceSlots tekrar tavanından düşülür", () => {
+    const base = splitBudget(240, 1, 100);
+    const withPractice = splitBudget(240, 1, 100, { practiceSlots: 1 });
+    assert.equal(withPractice.reviewCap, base.reviewCap - 55);
+  });
+
+  it("pratik payı bütçeyi aşmaz (negatif tekrar yok)", () => {
+    const { reviewCap } = splitBudget(240, 3, 100, { practiceSlots: 5 });
+    assert.ok(reviewCap >= 0, `negatif tekrar payı: ${reviewCap}`);
   });
 });

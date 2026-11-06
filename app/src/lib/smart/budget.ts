@@ -24,6 +24,29 @@ export const FIXED_DAILY_MINUTES = 100;
 /** Deneme gününde sınav süresi; yeni konuya yer bırakmaz. */
 export const MOCK_MINUTES = 165;
 
+/**
+ * Dönemsel günlük planlama kapasitesi (dakika).
+ *
+ * Varsayılan `studyMinutes` (240) bu eğriyi geçersiz kılamaz: program başlangıcı
+ * bu dönemlerin içinde olduğundan etkin kapasite her zaman eğriden gelir.
+ * Değerler zorunlu doldurulacak süre değil, motorun görev yoğunluğunu
+ * belirlerken dikkate aldığı üst sınırdır.
+ */
+export const CAPACITY_CURVE: { from: string; minutes: number }[] = [
+  { from: "2026-11-01", minutes: 330 },
+  { from: "2026-12-01", minutes: 390 },
+  { from: "2027-01-01", minutes: 480 },
+];
+
+/** Verilen gün için etkin günlük kapasite. Eğri kapsamı dışında `fallback`. */
+export function dailyCapacity(date: string, fallback = 240): number {
+  let minutes = fallback;
+  for (const point of CAPACITY_CURVE) {
+    if (date >= point.from) minutes = point.minutes;
+  }
+  return Math.max(fallback, minutes);
+}
+
 export interface DayLoad {
   isSunday: boolean;
   isMock: boolean;
@@ -55,14 +78,22 @@ export function splitBudget(
   budget: number,
   perDay: number,
   fixedMinutes: number,
-  { sunday = false, protectReviews = false }: { sunday?: boolean; protectReviews?: boolean } = {},
+  {
+    sunday = false,
+    protectReviews = false,
+    practiceSlots = 0,
+  }: { sunday?: boolean; protectReviews?: boolean; practiceSlots?: number } = {},
 ): BudgetSplit {
   // Pazar günü yeni konu açılmaz; kalan her şey tekrara gider.
   if (sunday) return { newTopicReserve: 0, reviewCap: Math.max(0, budget - fixedMinutes) };
   const room = Math.max(0, budget - fixedMinutes);
   let newTopicReserve = Math.min(perDay * TOPIC_MINUTES, room);
   if (protectReviews && newTopicReserve > TOPIC_MINUTES) newTopicReserve -= TOPIC_MINUTES;
-  return { newTopicReserve, reviewCap: Math.max(0, room - newTopicReserve) };
+  // Tekrarların bütçeyi tamamen doldurup başlanmış konuların soru çözümünü
+  // (pratik) açlığa itmesini engelle. Pratik payı tekrar tavanından düşülür;
+  // aksi hâlde yeni konu + tekrar `room`u bitirir ve hiçbir konu "Bitti" olamaz.
+  const practiceReserve = Math.min(practiceSlots * TOPIC_MINUTES, Math.max(0, room - newTopicReserve));
+  return { newTopicReserve, reviewCap: Math.max(0, room - newTopicReserve - practiceReserve) };
 }
 
 /**

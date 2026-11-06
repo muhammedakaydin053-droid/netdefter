@@ -32,6 +32,10 @@ after(async () => {
 const addDays = (iso: string, n: number) =>
   new Date(Date.parse(iso + "T12:00:00Z") + n * 86400000).toISOString().slice(0, 10);
 
+/** İki ISO tarih arasındaki tam gün sayısı (b - a). */
+const daysBetweenISO = (a: string, b: string) =>
+  Math.round((Date.parse(b + "T12:00:00Z") - Date.parse(a + "T12:00:00Z")) / 86400000);
+
 function seed() {
   return curriculum.map((t) => ({
     id: `${t.exam}|${t.subject}|${t.topic}|${t.subtopic}`,
@@ -226,5 +230,174 @@ describe("zayıf konu önceliği", () => {
     const row = ranked.find((r: any) => r.exam === "TYT" && r.topic === "Üslü Sayılar");
     assert.ok(row.reasons.some((s: string) => s.includes("kritik")), row.reasons.join(", "));
     assert.ok(row.reasons.some((s: string) => s.includes("12 yanlış")), row.reasons.join(", "));
+  });
+});
+
+describe("tamamlanmış konu ve pratik döngüsü", () => {
+  /** Bir konuyu "Çalışıyorum" yapıp günlük planı üretir. */
+  function withStarted(topicName: string, status = "Çalışıyorum", correct = 5) {
+    return seed().map((t) =>
+      t.topic === topicName && t.exam === "TYT"
+        ? { ...t, status, total: 10, correct, wrong: 10 - correct, lastStudy: "2026-11-05" }
+        : t,
+    );
+  }
+
+  it("başlanmış konu tekrar veya soru çözümü alır (kalıcı dışlanmaz)", () => {
+    // Regresyon: `avoid` kümesi, geçmişte anlatımı verilen her konuyu kalıcı
+    // olarak dışlıyordu; konu ne soru çözümü ne tekrar alıyor, hiç "Bitti"
+    // olamıyor ve AYT kapıları hiç açılmıyordu.
+    const topics = withStarted("Kimya Bilimi");
+    let got = false;
+    for (let i = 0; i < 10 && !got; i++) {
+      const date = addDays(S.programStart, i);
+      const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
+      got = slots.some(
+        (s: any) =>
+          s.topic === "Kimya Bilimi" && (s.kind === "Soru çözümü" || s.kind === "Tekrar"),
+      );
+    }
+    assert.ok(got, "başlanmış konu 10 günde hiç pratik/tekrar almadı");
+  });
+
+  it("tamamlanmış (Bitti) konuya yeni soru çözümü görevi yazmaz", () => {
+    // Regresyon: Bitti konular her gün "Soru çözümü" görevi alıp yeni konuların
+    // slotlarını tüketiyordu.
+    const topics = withStarted("Kimya Bilimi", "Bitti");
+    const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], "2026-11-10", new Set());
+    const practice = slots.find(
+      (s: any) => s.topic === "Kimya Bilimi" && s.kind === "Soru çözümü",
+    );
+    assert.equal(practice, undefined, "Bitti konuya soru çözümü verildi");
+  });
+});
+
+describe("kapasite eğrisi (330/390/480)", () => {
+  it("artan kapasite günlük yeni konu sayısını artırır", () => {
+    const cap = (d: string) => (d < "2026-12-01" ? 330 : d < "2027-01-01" ? 390 : 480);
+    const nov = E.planPace(seed(), { ...S, studyMinutes: cap("2026-11-10") }, "2026-11-10");
+    const jan = E.planPace(seed(), { ...S, studyMinutes: cap("2027-01-10") }, "2027-01-10");
+    assert.ok(jan.perDay >= nov.perDay, `Ocak perDay ${jan.perDay} < Kasım ${nov.perDay}`);
+    assert.ok(jan.capacity > nov.capacity, "Ocak kapasitesi Kasım'dan büyük olmalı");
+  });
+
+  it("480 dakika 450'den daha fazla slot üretmez (doygunluk)", () => {
+    // budget.ts formülü: (dk − 100) / 65. 450 ve 480 aynı slotu verir.
+    const b = E.planPace(seed(), { ...S, studyMinutes: 450 }, "2027-01-10");
+    const c = E.planPace(seed(), { ...S, studyMinutes: 480 }, "2027-01-10");
+    assert.equal(b.perDay, c.perDay);
+  });
+});
+
+describe("AYT ders dengesi (uçtan uca)", () => {
+  /** Motoru gün gün ilerletip her dersin ilk anlatım tarihini döndürür. */
+  function simulate(days: number) {
+    let topics = seed();
+    const first: Record<string, string> = {};
+    for (let i = 0; i < days; i++) {
+      const date = addDays(S.programStart, i);
+      const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
+      for (const sl of slots) {
+        if (!sl.exam || sl.kind === "Deneme" || sl.kind === "Yanlış analizi") continue;
+        const key = `${sl.exam}|${sl.subject}|${sl.topic}`;
+        if (sl.kind === "Konu anlatımı") {
+          if (sl.exam === "AYT") first[key] ??= date;
+          topics = topics.map((t) =>
+            t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic && t.status === "Başlamadım"
+              ? { ...t, status: "Çalışıyorum", lastStudy: date }
+              : t,
+          );
+        } else if (sl.kind === "Soru çözümü" || sl.kind === "Tekrar") {
+          // Tekrar da soru çözümüdür: öğrenilme şartını besler.
+          topics = topics.map((t) => {
+            if (!(t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic)) return t;
+            if (t.status === "Başlamadım") return t;
+            const q = Math.max(15, sl.targetQ || 15);
+            const total = (t.total ?? 0) + q;
+            const correct = (t.correct ?? 0) + Math.round(q * 0.78);
+            return { ...t, total, correct, lastStudy: date, status: total >= 15 && correct / total >= 0.7 ? "Bitti" : t.status };
+          });
+        }
+      }
+    }
+    return { first, topics };
+  }
+
+  it("TYT bitince AYT'nin tüm dersleri en geç 45 gün içinde başlar", () => {
+    // Regresyon: öncelik skoru yüksek Matematik diğer derslerin önüne geçiyor,
+    // ya da ilk başlayan ders (Kimya) AYT bütçesini tüketip Fizik/Geometri'yi
+    // aylarca bekletiyordu. Her ders kapı açıldıktan sonra makul sürede başlamalı.
+    const { first } = simulate(230);
+    const subjects = ["Matematik", "Geometri", "Fizik", "Kimya", "Biyoloji"];
+    const starts = subjects.map((s) => {
+      const dates = Object.entries(first)
+        .filter(([k]) => k.startsWith(`AYT|${s}|`))
+        .map(([, d]) => d);
+      return { s, d: dates.sort()[0] };
+    });
+    const last = starts.map((x) => x.d).sort().at(-1)!;
+    for (const { s, d } of starts) {
+      assert.ok(d, `AYT ${s} hiç başlamadı`);
+      assert.ok(
+        daysBetweenISO(d, last) <= 45,
+        `AYT ${s} (${d}) son başlayan dersten 45 günden fazla önce`,
+      );
+    }
+  });
+});
+
+describe("TYT ders kapsama garantisi", () => {
+  /** Motoru gün gün ilerletip her konunun ilk anlatım tarihini döndürür. */
+  function firstStarts(days: number) {
+    let topics = seed();
+    const first: Record<string, string> = {};
+    for (let i = 0; i < days; i++) {
+      const date = addDays(S.programStart, i);
+      const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
+      for (const sl of slots) {
+        if (!sl.exam || sl.kind === "Deneme" || sl.kind === "Yanlış analizi") continue;
+        if (sl.kind === "Konu anlatımı") {
+          first[`${sl.exam}|${sl.subject}|${sl.topic}`] ??= date;
+          topics = topics.map((t) =>
+            t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic && t.status === "Başlamadım"
+              ? { ...t, status: "Çalışıyorum", lastStudy: date }
+              : t,
+          );
+        } else {
+          topics = topics.map((t) => {
+            if (!(t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic)) return t;
+            if (t.status === "Başlamadım") return t;
+            const q = Math.max(15, sl.targetQ || 15);
+            const total = (t.total ?? 0) + q;
+            const correct = (t.correct ?? 0) + Math.round(q * 0.78);
+            return { ...t, total, correct, lastStudy: date, status: total >= 15 && correct / total >= 0.7 ? "Bitti" : t.status };
+          });
+        }
+      }
+    }
+    return first;
+  }
+
+  it("10 TYT dersi de programın ilk iki haftasında başlar", () => {
+    // Regresyon: tek sıralı round-robin yüzünden Coğrafya 16 Aralık'a (6 hafta)
+    // kayıyordu. Kapsama garantisi ile her ders ilk haftalarda başlamalı.
+    const first = firstStarts(30);
+    const subjects = [...new Set(curriculum.filter((t: any) => t.exam === "TYT").map((t: any) => t.subject))];
+    const limit = addDays(S.programStart, 14);
+    for (const s of subjects) {
+      const starts = Object.entries(first)
+        .filter(([k]) => k.startsWith(`TYT|${s}|`))
+        .map(([, d]) => d)
+        .sort();
+      assert.ok(starts.length > 0, `TYT ${s} hiç başlamadı`);
+      assert.ok(starts[0] <= limit, `TYT ${s} ilk iki haftada başlamadı: ${starts[0]}`);
+    }
+  });
+
+  it("Kimya Bilimi ilk hafta içinde başlar (Ocak'a sarkmaz)", () => {
+    const first = firstStarts(30);
+    const start = first["TYT|Kimya|Kimya Bilimi"];
+    assert.ok(start, "Kimya Bilimi hiç başlamadı");
+    assert.ok(start <= addDays(S.programStart, 7), `Kimya Bilimi çok geç: ${start}`);
   });
 });

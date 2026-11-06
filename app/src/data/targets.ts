@@ -27,9 +27,9 @@ export interface Targets {
 }
 
 export const TARGETS: Targets = {
-  programStart: "2026-11-04",
-  tytRound1: "2027-02-03",
-  aytRound1: "2027-04-18",
+  programStart: "2026-11-05",
+  tytRound1: "2027-02-04",
+  aytRound1: "2027-04-19",
   aytFlex: "2027-05-03",
   gapFill: "2027-05-13",
   finalPeriod: "2027-05-13",

@@ -54,9 +54,14 @@ after(async () => {
 });
 
 describe("migratePersistedState — eski programStart taşınır", () => {
-  it("(1) eski varsayılan '2026-11-01' -> yeni varsayılan '2026-11-04'", () => {
+  it("(1) eski varsayılan '2026-11-01' -> güncel varsayılan '2026-11-05'", () => {
     const out: any = S.migratePersistedState(legacyState(), 0);
-    assert.equal(out.settings.programStart, "2026-11-04");
+    assert.equal(out.settings.programStart, "2026-11-05");
+  });
+
+  it("(1b) v1 varsayılanı '2026-11-04' -> güncel '2026-11-05'", () => {
+    const out: any = S.migratePersistedState(legacyState({ settings: { programStart: "2026-11-04" } }), 1);
+    assert.equal(out.settings.programStart, "2026-11-05");
   });
 
   it("(2) sürüm PERSIST_VERSION'a eşitse dokunulmaz (tek seferlik)", () => {
@@ -67,14 +72,15 @@ describe("migratePersistedState — eski programStart taşınır", () => {
   it("(3) idempotent: ikinci kez çağrılınca sonuç değişmez", () => {
     const once: any = S.migratePersistedState(legacyState(), 0);
     const twice: any = S.migratePersistedState(once, 0);
-    assert.equal(twice.settings.programStart, "2026-11-04");
+    assert.equal(twice.settings.programStart, "2026-11-05");
     assert.deepEqual(twice.settings, once.settings);
   });
 
   it("(4) sabitler doğru değerleri taşır", () => {
     assert.equal(S.LEGACY_PROGRAM_START, "2026-11-01");
-    assert.equal(S.MIGRATED_PROGRAM_START, "2026-11-04");
-    assert.equal(S.PERSIST_VERSION, 1);
+    assert.equal(S.V1_PROGRAM_START, "2026-11-04");
+    assert.equal(S.MIGRATED_PROGRAM_START, "2026-11-05");
+    assert.equal(S.PERSIST_VERSION, 2);
   });
 });
 
@@ -84,9 +90,9 @@ describe("migratePersistedState — elle ayarlanan tarihe dokunmaz", () => {
     assert.equal(out.settings.programStart, "2026-12-01", "elle ayarlanan tarih bozuldu");
   });
 
-  it("(6) yeni varsayılan zaten ayarlıysa aynen kalır", () => {
-    const out: any = S.migratePersistedState(legacyState({ settings: { programStart: "2026-11-04" } }), 0);
-    assert.equal(out.settings.programStart, "2026-11-04");
+  it("(6) güncel varsayılan zaten ayarlıysa aynen kalır", () => {
+    const out: any = S.migratePersistedState(legacyState({ settings: { programStart: "2026-11-05" } }), 0);
+    assert.equal(out.settings.programStart, "2026-11-05");
   });
 
   it("(7) programStart yoksa hata vermez, diğer ayarlar korunur", () => {
@@ -136,12 +142,12 @@ describe("migratePersistedState — kullanıcı verisi değişmez", () => {
 });
 
 describe("migratePersistedState + merge — gerçek akış", () => {
-  it("(12) migrasyon sonrası varsayılanlarla birleşince programStart 2026-11-04 olur", async () => {
+  it("(12) migrasyon sonrası varsayılanlarla birleşince programStart 2026-11-05 olur", async () => {
     const D = (await server.ssrLoadModule("/src/lib/smart/types.ts")).DEFAULT_SETTINGS;
     const migrated: any = S.migratePersistedState(legacyState(), 0);
     // store.ts içindeki merge ile aynı kural:
     const mergedSettings = { ...D, ...migrated.settings };
-    assert.equal(mergedSettings.programStart, "2026-11-04");
+    assert.equal(mergedSettings.programStart, "2026-11-05");
     assert.equal(mergedSettings.examDate, "2027-06-19");
   });
 

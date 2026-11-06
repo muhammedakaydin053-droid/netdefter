@@ -146,19 +146,22 @@ function snapshot(s: AppState): DataSnapshot {
  * Kayıtlı (persist) ayarların sürümü. Bir kayıtta bu sürümden eski bir `version`
  * görülürse `migratePersistedState` çalışır.
  */
-export const PERSIST_VERSION = 1;
+export const PERSIST_VERSION = 2;
 
-/** Takvim 3 gün ileri kaydırılmadan önceki varsayılan program başlangıcı. */
+/** v0 varsayılanı: takvim kaydırmasından önceki program başlangıcı. */
 export const LEGACY_PROGRAM_START = "2026-11-01";
-/** Kaydırma sonrası yeni varsayılan program başlangıcı. */
-export const MIGRATED_PROGRAM_START = "2026-11-04";
+/** v1 varsayılanı (artık eski): şartnameyle uyuşmayan 1 gün gerideki başlangıç. */
+export const V1_PROGRAM_START = "2026-11-04";
+/** Güncel varsayılan: şartnamedeki program başlangıcı (05.11.2026). */
+export const MIGRATED_PROGRAM_START = "2026-11-05";
 
 /**
  * Eski kayıtlı durumu güncel şemaya taşır — SAF ve tek seferlik.
  *
- * Tek iş: `programStart` TAM OLARAK eski varsayılan (`2026-11-01`) ise yeni
- * varsayılana (`2026-11-04`) çevrilir. Kullanıcı başka bir tarihe elle
- * ayarladıysa DOKUNULMAZ; aksi hâlde kişisel plan bozulurdu.
+ * İki sürümlü zincir, `programStart` TAM OLARAK eski bir varsayılana eşitse
+ * ilerletilir: v0 (`2026-11-01`) → v1 (`2026-11-04`) → v2 (`2026-11-05`).
+ * Kullanıcı başka bir tarihe elle ayarladıysa DOKUNULMAZ; aksi hâlde kişisel
+ * plan bozulurdu.
  *
  * Girdi mutasyona uğratılmaz (sığ kopya alınır); `topics`, `wrongs`, `tytExams`,
  * `aytExams`, `daily`, `archivedTopics`, `carry` ve diğer ayar alanları aynen
@@ -175,10 +178,11 @@ export function migratePersistedState(persisted: unknown, fromVersion: number): 
   const rawSettings = p.settings;
   if (rawSettings && typeof rawSettings === "object") {
     const settings = { ...(rawSettings as Record<string, unknown>) };
-    if (settings.programStart === LEGACY_PROGRAM_START) {
-      settings.programStart = MIGRATED_PROGRAM_START;
-      p.settings = settings;
-    }
+    // v0 -> v1: 3 günlük kaydırma.
+    if (settings.programStart === LEGACY_PROGRAM_START) settings.programStart = V1_PROGRAM_START;
+    // v1 -> v2: şartnameyle hizalama (05.11.2026).
+    if (settings.programStart === V1_PROGRAM_START) settings.programStart = MIGRATED_PROGRAM_START;
+    p.settings = settings;
   }
   return p;
 }

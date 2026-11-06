@@ -2,7 +2,7 @@ import { frequencyScore, frequencyTier, DISTRIBUTION } from "@/data/distribution
 import { aytMockReady, aytUnlocks, isGaranti, tytMockReady } from "@/data/roadmap";
 import { buildTimeline, isCoreTopic, isOngoingTopic, orderAllowed, orderBoost, phaseFor } from "@/data/sequence";
 import { countsIssue, n, pctOf, sanitizeCounts } from "@/lib/calc";
-import { splitBudget, capacity, type DayLoad } from "@/lib/smart/budget";
+import { splitBudget, capacity, dailyCapacity, type DayLoad } from "@/lib/smart/budget";
 import { topicAggregates, aytNets, tytNets, dailyTotals } from "@/lib/stats";
 import type { AytExam, DailyRow, TopicRow, TytExam, WrongRow } from "@/lib/types";
 import { addDaysISO, todayISO, uid } from "@/lib/utils";
@@ -528,7 +528,9 @@ export function planPace(topics: TopicRow[], settings: ScheduleSettings, today =
     const isMock = settings.mockWeekdays.includes(wd) || (ph.mockIntensity >= 2 && wd === 3);
     teachWindow.push({ isSunday: wd === 0, isMock });
   }
-  const cap = capacity(teachWindow, settings.studyMinutes);
+  // Kapasite dönemsel eğriden gelir; varsayılan 240 onu geçersiz kılamaz.
+  const studyMinutes = dailyCapacity(from, settings.studyMinutes);
+  const cap = capacity(teachWindow, studyMinutes);
   const perDay = cap.teachDays > 0
     ? Math.min(cap.perDay, Math.max(1, Math.ceil(leftTopics / cap.teachDays)))
     : 0;
@@ -579,7 +581,15 @@ export function planPace(topics: TopicRow[], settings: ScheduleSettings, today =
   const aytLeft = leftTopics - tytLeft;
   const tytPerDayWithAyt = Math.max(1, cap.perDay - 1);
   const canAffordAyt = tytLeft <= tytPerDayWithAyt * tytWindowDays;
-  const aytPerDay = aytGateOpen && aytLeft > 0 && cap.perDay >= 2 && canAffordAyt ? 1 : 0;
+  // TYT sürerken AYT'ye 1 slot; TYT bitince kalan kapasitenin tamamı AYT'ye
+  // geçer. Aksi hâlde AYT, TYT bittikten sonra da günde 1 konuyla sınırlı
+  // kalıyor ve ilk tur gereksiz yere uzuyordu.
+  const aytPerDay =
+    aytGateOpen && aytLeft > 0 && cap.perDay >= 2 && canAffordAyt
+      ? tytLeft > 0
+        ? Math.min(2, Math.max(1, cap.perDay - tytPerDayNeeded))
+        : Math.min(2, cap.perDay - 1)
+      : 0;
   const tytPerDay = Math.min(tytPerDayNeeded, Math.max(1, cap.perDay - aytPerDay));
 
   // Hız senaryoları: günde kaç yeni konu hedeflenirse TYT ne zaman biter.
@@ -648,7 +658,8 @@ export function buildDailyPlan(
   const ranked = rankTopics(topics, daily, wrongs, today);
   const reviews = dueReviews(topics, daily, today);
   const extra = Math.min(45, Math.round(carry.reduce((a, c) => a + c.minutes, 0) / 3));
-  let budget = settings.studyMinutes + extra;
+  // Dönemsel kapasite eğrisi (330/390/480); varsayılan 240'ı geçersiz kılar.
+  let budget = dailyCapacity(today, settings.studyMinutes) + extra;
   if (sunday) budget = Math.max(90, Math.round(budget * 0.5));
   // Sabit günlük görevlerin (paragraf, problem, yanlış analizi) toplam dakikası.
   let fixedMinutes = 0;
@@ -760,7 +771,13 @@ export function buildDailyPlan(
   //   2) tekrar (bütçede kalan pay kadar)
   //   3) başlanmış konuların soru çözümü
   // Yeni konu en sona bırakılırsa sabit görevler bütçeyi doldurup program durur.
-  const split = splitBudget(budget, pace.perDay, fixedMinutes, { sunday });
+  const split = splitBudget(budget, pace.perDay, fixedMinutes, {
+    sunday,
+    // Tekrarların pratiği açlığa itmemesi için pratiğe slot ayrılır. Her konu
+    // 1 anlatım + 1 soru çözümü tükettiğinden, TYT bittikten sonra AYT'nin
+    // tıkanmaması için pratik payı artırılır.
+    practiceSlots: sunday ? 0 : Math.max(1, Math.min(2, pace.perDay - 1)),
+  });
   const used2 = new Set<string>();
   // Sert sıra için "başlanmış" küme: bitmiş konular + bugün plana giren yeni konular.
   // Böylece aynı gün ardışık iki konu alınabilir, ama sıra atlanamaz.
@@ -770,15 +787,22 @@ export function buildDailyPlan(
   const addTask = (r: (typeof ranked)[number], kindOverride?: string): boolean => {
     if (tasks.length > (sunday ? 5 : 8)) return false;
     if (tasks.some((t) => t.topic === r.topic && t.subject === r.subject)) return false;
-    if (avoid.has(`${r.exam}|${r.subject}|${r.topic}`)) return false;
+    const isNew = r.status === "Başlamadım";
+    // `avoid` yalnızca AYNI konunun anlatımını tekrar açmayı engeller.
+    // Soru çözümü/tekrar engellenmez: aksi hâlde geçmişte anlatımı verilmiş
+    // her konu kalıcı olarak dışlanıyor ve hiçbir konu "Bitti" olamıyordu.
+    if (isNew && avoid.has(`${r.exam}|${r.subject}|${r.topic}`)) return false;
     if (used2.has(`${r.exam}|${r.subject}|${r.topic}`)) return false;
     if (r.health === "iyi" && r.freq < 0.5) return false;
-    const isNew = r.status === "Başlamadım";
     if (isNew && (sunday || !phase.newTopics)) return false;
     // Sert ön koşul: AYT kapısı kapalıysa konu hiç açılmaz (yumuşak ceza yeterli değil).
     if (isNew && !r.aytOpen) return false;
     // Sert sıra: ders içinde önceki konular başlamadan bu konu açılmaz.
     if (isNew && !orderAllowed(r.exam, r.subject, r.topic, started)) return false;
+    // Tamamlanmış konuya yeni "Soru çözümü" görevi yazılmaz. Bitmiş konunun
+    // bakımı tekrar (SRS) görevleriyle yapılır; yoksa aynı konu her gün
+    // tekrar tekrar soru görevi alıp yeni konuların önünü kesiyordu.
+    if (!isNew && r.status === "Bitti" && !kindOverride) return false;
     tasks.push({
       exam: r.exam,
       subject: r.subject,
@@ -797,12 +821,76 @@ export function buildDailyPlan(
   // 1. geçiş: yeni konular — bütçede ayrılan rezervi kullanır.
   // TYT ve AYT için ayrı kontenjan: TYT tur 1 hedefine yetişmesi gerektiğinden
   // TYT önce gelir, AYT kalan slotu kullanır. Kontenjan yoksa ilgili sınav atlanır.
+  //
+  // AYT adayları dersler arasında DÖNÜŞÜMLÜ sıralanır: aksi hâlde öncelik
+  // skoru yüksek Matematik (18 konu) diğer derslerin önüne geçiyor ve Fizik/
+  // Kimya/Biyoloji kapıları açılmasına rağmen haftalarca başlamıyordu.
+  const aytBySubject = new Map<string, (typeof ranked)[number][]>();
+  for (const r of ranked) {
+    if (r.exam !== "AYT" || r.status !== "Başlamadım" || !r.aytOpen) continue;
+    const list = aytBySubject.get(r.subject) ?? [];
+    list.push(r);
+    aytBySubject.set(r.subject, list);
+  }
+  // Dersler EN GERİDE OLANDAN öne doğru dizilir (ilerleme = başlanmış/toplam):
+  // büyük dersler daha çok slot alır, ama hiçbir ders kapı açıkken aç kalmaz.
+  const progressOf = new Map<string, number>();
+  for (const subject of aytBySubject.keys()) {
+    const rows = topics.filter((t) => t.exam === "AYT" && t.subject === subject);
+    progressOf.set(subject, rows.length ? rows.filter((t) => t.status !== "Başlamadım").length / rows.length : 1);
+  }
+  const orderedSubjects = [...aytBySubject.keys()].sort(
+    (a, b) => (progressOf.get(a) ?? 0) - (progressOf.get(b) ?? 0),
+  );
+  // `ranked` öncelik sıralıdır, ders sırası değil; bir dersin önde görünen
+  // konusu sert sıra kuralınca bloke olabilir (ör. Fizik'te "Newton Yasaları"
+  // gelip "Vektörler" beklemede). Bu yüzden sıradaki konu `orderAllowed` ile
+  // seçilir; aksi hâlde ders aylarca başlamıyordu.
+  const aytQueues = orderedSubjects.map((subject) => {
+    const list = aytBySubject.get(subject)!;
+    const first = list.find((r) => orderAllowed(r.exam, r.subject, r.topic, started));
+    return first ? [first, ...list.filter((r) => r !== first)] : list;
+  });
+  const aytInterleaved: (typeof ranked)[number][] = [];
+  for (let more = true; more; ) {
+    more = false;
+    for (const queue of aytQueues) {
+      const next = queue.shift();
+      if (next) {
+        aytInterleaved.push(next);
+        more = true;
+      }
+    }
+  }
+  const tytCandidates = ranked.filter((r) => r.exam === "TYT" && r.status === "Başlamadım");
+  // TYT ders dengesi: hiç başlamamış dersler öne alınır, aksi hâlde 10 ders
+  // tek sıradan döndüğü için Türkçe/Matematik sırası gereği Coğrafya gibi
+  // dersler haftalarca beklemeden başlayamıyordu. Her dersin sıradaki
+  // (orderAllowed) konusu öne alınır; sonra kalan adaylar öncelik sırasına
+  // göre gelir. Böylece tüm TYT dersleri ilk haftalardan itibaren düzenli
+  // ilerler; hiçbir ders "aç kalarak" haftalarca beklemez.
+  const tytBySubject = new Map<string, (typeof ranked)[number][]>();
+  for (const r of tytCandidates) {
+    const list = tytBySubject.get(r.subject) ?? [];
+    list.push(r);
+    tytBySubject.set(r.subject, list);
+  }
+  const tytFresh = [...tytBySubject.keys()].filter(
+    (s) => !topics.some((t) => t.exam === "TYT" && t.subject === s && t.status !== "Başlamadım"),
+  );
+  const tytFirst: (typeof ranked)[number][] = [];
+  for (const s of tytFresh) {
+    const list = tytBySubject.get(s)!;
+    const first = list.find((r) => orderAllowed(r.exam, r.subject, r.topic, started));
+    if (first) tytFirst.push(first);
+  }
+  const tytOrdered = [...tytFirst, ...tytCandidates.filter((r) => !tytFirst.includes(r))];
+  const newCandidates = [...tytOrdered, ...aytInterleaved];
   let newCount = 0;
   let tytNew = 0;
   let aytNew = 0;
-  for (const r of ranked) {
+  for (const r of newCandidates) {
     if (newCount >= pace.perDay) break;
-    if (r.status !== "Başlamadım") continue;
     const isTyt = r.exam === "TYT";
     if (isTyt && tytNew >= pace.tytPerDay) continue;
     if (!isTyt && aytNew >= pace.aytPerDay) continue;

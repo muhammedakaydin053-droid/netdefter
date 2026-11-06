@@ -44,7 +44,7 @@ describe("buildTimeline", () => {
   it("anchors phase boundaries to the user's target dates", () => {
     assert.deepEqual(
       timeline.map((p) => p.from),
-      ["2026-10-28", "2027-02-03", "2027-04-18", "2027-05-03", "2027-05-13"],
+      ["2026-10-28", "2027-02-04", "2027-04-19", "2027-05-03", "2027-05-13"],
     );
   });
 
