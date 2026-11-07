@@ -784,3 +784,94 @@ describe("TYT ders sürekliliği", () => {
     assert.ok(Math.min(...perWeek) >= 2, `bir haftada yeni konu neredeyse hiç açılmadı: ${Math.min(...perWeek)}`);
   });
 });
+
+/**
+ * Başarı senaryosu simülasyonu. `acc(exam, subject)` sabit başarı oranı döner.
+ * "Bitti" yalnızca 15 soru + %70 sağlanınca atanır (uygulamadaki gerçek kural).
+ */
+function simulateAcc(acc: (exam: string, subject: string) => number, days: number) {
+  let topics = seed();
+  const taughtBySubject = new Map<string, Set<string>>();
+  const recoveryKinds = new Map<string, Set<string>>();
+  let emptyDays = 0;
+  for (let i = 0; i < days; i++) {
+    const date = addDays(S.programStart, i);
+    const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
+    const academic = slots.filter(
+      (s: any) => s.exam && s.kind !== "Deneme" && s.kind !== "Yanlış analizi",
+    );
+    if (academic.length === 0) emptyDays += 1;
+    for (const sl of slots) {
+      if (!sl.exam || sl.kind === "Deneme" || sl.kind === "Yanlış analizi") continue;
+      if (sl.kind === "Konu anlatımı") {
+        const sk = `${sl.exam}|${sl.subject}`;
+        const set = taughtBySubject.get(sk) ?? new Set<string>();
+        set.add(sl.topic);
+        taughtBySubject.set(sk, set);
+      }
+      if (/Eksik kapatma turu/.test(sl.reason || "")) {
+        const tk = `${sl.exam}|${sl.subject}|${sl.topic}`;
+        const set = recoveryKinds.get(tk) ?? new Set<string>();
+        set.add(sl.kind);
+        recoveryKinds.set(tk, set);
+      }
+      const a = acc(sl.exam, sl.subject);
+      if (sl.kind === "Konu anlatımı") {
+        topics = topics.map((t) =>
+          t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic && t.status === "Başlamadım"
+            ? { ...t, status: "Çalışıyorum", lastStudy: date }
+            : t,
+        );
+      } else {
+        topics = topics.map((t) => {
+          if (!(t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic)) return t;
+          if (t.status === "Başlamadım") return t;
+          const q = Math.max(15, sl.targetQ || 15);
+          const total = (t.total ?? 0) + q;
+          const correct = (t.correct ?? 0) + Math.round(q * a);
+          const mastered = total >= 15 && correct / total >= 0.7;
+          return { ...t, total, correct, lastStudy: date, status: mastered ? "Bitti" : t.status };
+        });
+      }
+    }
+  }
+  const mastered = topics.filter(
+    (t) =>
+      t.status === "Bitti" && (t.total ?? 0) >= 15 && (t.correct ?? 0) / (t.total ?? 1) >= 0.7,
+  ).length;
+  return { topics, taughtBySubject, recoveryKinds, emptyDays, mastered };
+}
+
+describe("öğrenme kapısı ve eksik kapatma", () => {
+  it("%50 başarıda derste sonraki konu açılmaz, program kilitlenmez", () => {
+    // Kullanıcı kuralı 2 + 3: aynı derste önceki konu öğrenilmeden yenisi
+    // açılmaz; ama plan boş kalmaz ve eksik kapatma devam eder.
+    const r = simulateAcc(() => 0.5, 60);
+    for (const [sk, taught] of r.taughtBySubject) {
+      assert.ok(
+        taught.size <= 1,
+        `${sk} dersinde öğrenilmeden ${taught.size} konu açıldı: ${[...taught].join(", ")}`,
+      );
+    }
+    assert.equal(r.mastered, 0, "başarı sağlanmadan konu Bitti sayılmamalı");
+    assert.equal(r.emptyDays, 0, `plan boş gün içeriyor (kilitlenme): ${r.emptyDays}`);
+    assert.ok(r.recoveryKinds.size > 0, "öğrenilmemiş konu için eksik kapatma görevi üretilmedi");
+  });
+
+  it("eksik kapatma aynı görevi tekrarlamaz, tür değiştirir", () => {
+    // Kullanıcı kuralı 6: aynı başarısız pratik görevi sürekli tekrarlanmaz.
+    const r = simulateAcc(() => 0.5, 60);
+    const varieties = [...r.recoveryKinds.values()].map((s) => s.size);
+    assert.ok(varieties.length > 0, "hiç eksik kapatma görevi yok");
+    assert.ok(
+      Math.max(...varieties) >= 2,
+      `eksik kapatma hep aynı türde kaldı: ${JSON.stringify([...r.recoveryKinds].slice(0, 3))}`,
+    );
+  });
+
+  it("%78 başarıda program ilerler ve konular öğrenilir", () => {
+    const r = simulateAcc(() => 0.78, 150);
+    assert.ok(r.mastered > 200, `öğrenilen konu sayısı düşük: ${r.mastered}`);
+    assert.equal(r.emptyDays, 0, "plan boş gün içeriyor");
+  });
+});

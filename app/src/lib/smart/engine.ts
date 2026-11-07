@@ -2,7 +2,7 @@ import { frequencyScore, frequencyTier, DISTRIBUTION } from "@/data/distribution
 import { aytMockReady, aytUnlocks, isGaranti, tytMockReady } from "@/data/roadmap";
 import { buildTimeline, isCoreTopic, isOngoingTopic, orderAllowed, orderBoost, phaseFor } from "@/data/sequence";
 import { countsIssue, n, pctOf, sanitizeCounts } from "@/lib/calc";
-import { MIN_QUESTIONS_FOR_MASTERED } from "@/lib/smart/progress";
+import { MIN_QUESTIONS_FOR_MASTERED, MASTERY_RATIO } from "@/lib/smart/progress";
 import { splitBudget, capacity, dailyCapacity, type DayLoad } from "@/lib/smart/budget";
 import { topicAggregates, aytNets, tytNets, dailyTotals } from "@/lib/stats";
 import type { AytExam, DailyRow, TopicRow, TytExam, WrongRow } from "@/lib/types";
@@ -799,27 +799,32 @@ export function buildDailyPlan(
     practiceSlots: sunday ? 0 : Math.max(1, Math.min(2, pace.perDay - 1)),
   });
   const used2 = new Set<string>();
-  // İlerleme kapısı (sert sıra) için "hazır" küme. Kullanıcı kuralı: aynı derste
-  // önceki konunun TEMEL SORU ÇÖZÜMÜ bitmeden sonraki yeni konuya geçilmez.
+  // İlerleme kapısı (sert sıra) için "öğrenilmiş" küme.
   //
-  // ÖNEMLİ: Kapı "Öğrenildi" (15 soru + %70) DEĞİL, "temel soru çözümü yapıldı"
-  // (>= 15 soru) seviyesidir. Önceden yalnızca status === "Bitti" kabul ediliyordu;
-  // "Bitti" ise %70 başarı şartına bağlı. Başarısı kalıcı olarak %70 altında kalan
-  // bir öğrencide hiçbir konu "Bitti" olamıyor, dolayısıyla her dersin yalnızca
-  // ilk konusu açılıp program 10. günde tamamen kilitleniyordu (ölçüm: 186 konudan
-  // 10'u başlıyor, 0'ı bitiyor). %70 eşiği "Öğrenildi" etiketi için KORUNUR
-  // (`progress.ts`); yalnızca sıradaki konuya geçiş kapısı pratik tamamlanmasına
-  // bağlanır. Yeterli pratiği olup %70'e ulaşamayan konu "Bitti" sayılmaz ve
-  // eksik kapatma rotasyonunda (3. geçiş) çalışmaya devam eder.
+  // Kullanıcı kuralı: aynı derste sonraki YENİ konuya geçmek için önceki konunun
+  // ÖĞRENİLMİŞ olması gerekir. Öğrenilmiş = "Bitti" + en az 15 soru + en az %70
+  // doğru (bkz. progress.ts). Eşik DEĞİŞMEZ; başarı sağlanmadan konu Bitti
+  // yapılmaz, dolayısıyla sıradaki konu açılmaz.
+  //
+  // Kilit GLOBAL DEĞİL, DERS BAZINDADIR: bir derste takılı kalan konu yalnızca O
+  // dersin yeni konusunu durdurur; bağımsız dersler ilerlemeye devam eder. Bu
+  // yüzden tek bir dersin başarısızlığı tüm programı dondurmaz. Takılı konu ise
+  // görünür kalır ve eksik kapatma rotasyonunda (3. geçiş) çalışmaya devam eder.
   const progressionReady = new Set<string>(
     topics
-      .filter((t) => t.status === "Bitti" || (t.total ?? 0) >= MIN_QUESTIONS_FOR_MASTERED)
+      .filter(
+        (t) =>
+          t.status === "Bitti" &&
+          (t.total ?? 0) >= MIN_QUESTIONS_FOR_MASTERED &&
+          (t.total ?? 0) > 0 &&
+          ((t.correct ?? 0) / (t.total ?? 1)) >= MASTERY_RATIO,
+      )
       .map((t) => `${t.exam}|${t.subject}|${t.topic}`),
   );
   // Eksik kapatma rotasyonu: takılı bir konu için sırayla uygulanan görev
-  // türleri. Aynı görevi (ör. her gün 18 soru) tekrar üretmek yerine konu
-  // anlatımı → tekrar → anlatıma dönüş → yanlış analizi döner. Deneme sayısı
-  // çözülen soru miktarından (total/15) tahmin edilir; her oturum >=15 soru ekler.
+  // türleri. Aynı görevi (ör. her gün 18 soru) tekrar üretmek yerine
+  // soru çözümü → tekrar → konu anlatımı → yanlış analizi döner. Tur seçimi
+  // güne + konuya bağlıdır (bkz. aşağıda); soru sayısına bağlamak yanlıştı.
   const RECOVERY_KINDS: PlanSlot["kind"][] = ["Soru çözümü", "Tekrar", "Konu anlatımı", "Yanlış analizi"];
   const RECOVERY_TARGET: Record<string, number> = { "Soru çözümü": 18, Tekrar: 15, "Konu anlatımı": 0, "Yanlış analizi": 12 };
   // Öğrencinin hangi alt konuda / hangi hata türünde zorlandığını özetler.
@@ -1106,14 +1111,21 @@ export function buildDailyPlan(
       .sort((a, b) => (a.success ?? 0) - (b.success ?? 0)),
   );
   for (const r of recoveryRows) {
-    const attempts = Math.floor((r.total ?? 0) / 15);
-    const kind = RECOVERY_KINDS[attempts % RECOVERY_KINDS.length];
+    // Tur seçimi GÜNE ve konuya bağlıdır; `total/15` gibi soru sayısına bağlamak
+    // yanlıştı: "Konu anlatımı" görevi soru eklemediği için tur ilerlemiyor ve
+    // aynı görev her gün tekrarlanıyordu (ölçüm: aynı 3 "Konu anlatımı" görevi
+    // 13 gün üst üste). Gün indeksi her gün bir sonraki türe geçer; konu bazlı
+    // ofset ile aynı gün farklı konular farklı tür alır.
+    const dayIdx = Math.round(daysBetween(settings.programStart || today, today));
+    const topicSeed = [...`${r.exam}|${r.subject}|${r.topic}`].reduce((a, c) => a + c.charCodeAt(0), 0);
+    const round = ((dayIdx + topicSeed) % RECOVERY_KINDS.length + RECOVERY_KINDS.length) % RECOVERY_KINDS.length;
+    const kind = RECOVERY_KINDS[round];
     const st = struggleOf(r.exam, r.subject, r.topic);
     const detail = st ? ` Alt konu: ${st.subtopic || "-"}, hata: ${st.reason || "-"}` : "";
     addTask(r, kind, {
       targetQ: RECOVERY_TARGET[kind],
       minutes: kind === "Konu anlatımı" ? 55 : kind === "Yanlış analizi" ? 40 : 55,
-      reason: `${attempts + 1}. eksik kapatma turu: ${kind} (başarı %${Math.round((r.success ?? 0) * 100)}).${detail}`,
+      reason: `Eksik kapatma turu: ${kind} (başarı %${Math.round((r.success ?? 0) * 100)}).${detail}`,
       tier: 3,
     });
   }
