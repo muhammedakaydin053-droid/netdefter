@@ -875,3 +875,194 @@ describe("öğrenme kapısı ve eksik kapatma", () => {
     assert.equal(r.emptyDays, 0, "plan boş gün içeriyor");
   });
 });
+
+/**
+ * Tek konuya odaklanan simülasyon. `accAt(gün indeksi)` o günün başarı oranını
+ * verir. Takılı konunun tür çeşitliliği, karanlık günleri ve sonraki konuya
+ * geçişi gözlenir.
+ */
+function simulateOne(accAt: (i: number) => number, days: number, maxGrade = 12) {
+  let topics = seed();
+  const kinds = new Set<string>();
+  let darkDays = 0;
+  let progressedOn: number | null = null;
+  let sameKindRun = 0;
+  let maxSameKindRun = 0;
+  let lastKind = "";
+  const nextTopic = "Sayı Basamakları";
+  for (let i = 0; i < days; i++) {
+    const date = addDays(S.programStart, i);
+    const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
+    const mine = slots.filter(
+      (s: any) => s.exam === "TYT" && s.subject === "Matematik" && s.topic === "Temel Kavramlar",
+    );
+    const already = topics.some(
+      (t: any) =>
+        t.exam === "TYT" && t.subject === "Matematik" && t.topic === nextTopic && t.status !== "Başlamadım",
+    );
+    if (mine.length === 0 && !already && i <= maxGrade) darkDays += 1;
+    for (const s of mine) {
+      if (/Eksik kapatma turu/.test(s.reason || "")) kinds.add(s.kind);
+      // Aynı görev türü üst üste kaç gün tekrar etti?
+      const sig = `${s.kind}|${s.targetQ ?? ""}`;
+      if (sig === lastKind) sameKindRun += 1;
+      else {
+        lastKind = sig;
+        sameKindRun = 1;
+      }
+      maxSameKindRun = Math.max(maxSameKindRun, sameKindRun);
+    }
+    if (
+      progressedOn === null &&
+      topics.some(
+        (t: any) =>
+          t.exam === "TYT" && t.subject === "Matematik" && t.topic === nextTopic && t.status !== "Başlamadım",
+      )
+    ) {
+      progressedOn = i;
+    }
+    const acc = accAt(i);
+    for (const sl of slots) {
+      if (!sl.exam || sl.kind === "Deneme" || sl.kind === "Yanlış analizi") continue;
+      if (sl.kind === "Konu anlatımı") {
+        topics = topics.map((t: any) =>
+          t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic && t.status === "Başlamadım"
+            ? { ...t, status: "Çalışıyorum", lastStudy: date }
+            : t,
+        );
+      } else {
+        topics = topics.map((t: any) => {
+          if (!(t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic)) return t;
+          if (t.status === "Başlamadım") return t;
+          const q = Math.max(15, sl.targetQ || 15);
+          const total = (t.total ?? 0) + q;
+          const correct = (t.correct ?? 0) + Math.round(q * acc);
+          const mastered = total >= 15 && correct / total >= 0.7;
+          return { ...t, total, correct, lastStudy: date, status: mastered ? "Bitti" : t.status };
+        });
+      }
+    }
+  }
+  const tk = topics.find(
+    (t: any) => t.exam === "TYT" && t.subject === "Matematik" && t.topic === "Temel Kavramlar",
+  );
+  return { kinds, darkDays, progressedOn, tk, maxSameKindRun };
+}
+
+describe("eksik kapatma öğrenmeyi gerçekten sağlıyor mu", () => {
+  it("takılı konu günlerce görevsiz kalmaz", () => {
+    // Regresyon: başarısız konu SRS "Tekrar"ına kilitlenip rotasyon devre dışı
+    // kalınca görev listesinin sonunda bütçe bulamıyor ve 14 gün üst üste
+    // hiçbir görev almıyordu (20 Kas–3 Ara ölçümü).
+    const r = simulateOne(() => 0.6, 30);
+    assert.ok(r.darkDays <= 4, `takılı konu ${r.darkDays} gün görevsiz kaldı`);
+  });
+
+  it("eksik kapatma türleri döner, aynı görev üst üste tekrarlanmaz", () => {
+    // Kullanıcı kuralı 6: aynı başarısız görev her gün tekrarlanmamalı.
+    // Regresyon: takılı konuya 12 gün üst üste aynı "Tekrar (25 soru)" yazılıyordu.
+    const r = simulateOne(() => 0.6, 30);
+    assert.ok(
+      r.kinds.size >= 3,
+      `eksik kapatma tür çeşitliliği düşük: ${JSON.stringify([...r.kinds])}`,
+    );
+    assert.ok(
+      r.maxSameKindRun <= 2,
+      `aynı görev ${r.maxSameKindRun} gün üst üste tekrarlandı`,
+    );
+  });
+
+  it("%60'tan %75'e yükselen öğrenci aynı derste yeniden ilerler", () => {
+    // Senaryo 1: ilk 8 gün %60 (takıl), sonra %75 (toparlan) → konu Bitti olmalı
+    // ve TYT Matematik'te sıradaki konu açılmalı.
+    const r = simulateOne((i) => (i < 8 ? 0.6 : 0.75), 40);
+    assert.equal(r.tk.status, "Bitti", `konu Bitti olmadı: ${r.tk.status}`);
+    assert.ok((r.tk.total ?? 0) >= 15, "15 soru koşulu sağlanmadı");
+    assert.ok(
+      (r.tk.correct ?? 0) / (r.tk.total ?? 1) >= 0.7,
+      "öğrenilme yüzdesi %70 altında",
+    );
+    assert.ok(r.progressedOn !== null, "aynı derste sıradaki konu hiç açılmadı");
+    assert.ok(r.darkDays <= 4, `takılı konu ${r.darkDays} gün görevsiz kaldı`);
+  });
+
+  it("ders bazlı kilit: başarısız ders diğer dersleri durdurmaz", () => {
+    // Senaryo 2: Matematik %60'ta takılırken diğer dersler %78 ile ilerlemeli.
+    let topics = seed();
+    const failedSubjectProgress: number[] = [];
+    let othersStarted = 0;
+    for (let i = 0; i < 60; i++) {
+      const date = addDays(S.programStart, i);
+      const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
+      for (const sl of slots) {
+        if (!sl.exam || sl.kind === "Deneme" || sl.kind === "Yanlış analizi") continue;
+        const acc = sl.subject === "Matematik" ? 0.6 : 0.78;
+        if (sl.kind === "Konu anlatımı") {
+          topics = topics.map((t: any) =>
+            t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic && t.status === "Başlamadım"
+              ? { ...t, status: "Çalışıyorum", lastStudy: date }
+              : t,
+          );
+        } else {
+          topics = topics.map((t: any) => {
+            if (!(t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic)) return t;
+            if (t.status === "Başlamadım") return t;
+            const q = Math.max(15, sl.targetQ || 15);
+            const total = (t.total ?? 0) + q;
+            const correct = (t.correct ?? 0) + Math.round(q * acc);
+            const mastered = total >= 15 && correct / total >= 0.7;
+            return { ...t, total, correct, lastStudy: date, status: mastered ? "Bitti" : t.status };
+          });
+        }
+      }
+      failedSubjectProgress.push(
+        topics.filter(
+          (t: any) => t.exam === "TYT" && t.subject === "Matematik" && t.status !== "Başlamadım",
+        ).length,
+      );
+    }
+    othersStarted = topics.filter(
+      (t: any) => t.subject !== "Matematik" && t.status !== "Başlamadım",
+    ).length;
+    // Başarısız derste yalnızca ilk konu açık kalmalı.
+    assert.ok(
+      failedSubjectProgress.at(-1)! <= 1,
+      `Matematik'te öğrenilmeden ${failedSubjectProgress.at(-1)} konu açıldı`,
+    );
+    // Diğer dersler normal ilerlemeli (kilit global değil).
+    assert.ok(othersStarted >= 20, `diğer dersler ilerlemedi: ${othersStarted} konu başladı`);
+  });
+
+  it("eksik kapatma görevleri günlük kapasiteyi aşmaz", () => {
+    // Kural: üretilen görev süreleri o günün kapasitesini geçmemeli.
+    let topics = seed();
+    let over = 0;
+    for (let i = 0; i < 60; i++) {
+      const date = addDays(S.programStart, i);
+      const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
+      const total = slots.reduce((a: number, s: any) => a + s.minutes, 0);
+      const cap = B.dailyCapacity(date, S.studyMinutes);
+      if (total > cap) over += 1;
+      for (const sl of slots) {
+        if (!sl.exam || sl.kind === "Deneme" || sl.kind === "Yanlış analizi") continue;
+        if (sl.kind === "Konu anlatımı") {
+          topics = topics.map((t: any) =>
+            t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic && t.status === "Başlamadım"
+              ? { ...t, status: "Çalışıyorum", lastStudy: date }
+              : t,
+          );
+        } else {
+          topics = topics.map((t: any) => {
+            if (!(t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic)) return t;
+            if (t.status === "Başlamadım") return t;
+            const q = Math.max(15, sl.targetQ || 15);
+            const total2 = (t.total ?? 0) + q;
+            const correct = (t.correct ?? 0) + Math.round(q * 0.6);
+            return { ...t, total: total2, correct, lastStudy: date };
+          });
+        }
+      }
+    }
+    assert.equal(over, 0, `kapasite aşılan gün sayısı: ${over}`);
+  });
+});

@@ -827,6 +827,17 @@ export function buildDailyPlan(
   // güne + konuya bağlıdır (bkz. aşağıda); soru sayısına bağlamak yanlıştı.
   const RECOVERY_KINDS: PlanSlot["kind"][] = ["Soru çözümü", "Tekrar", "Konu anlatımı", "Yanlış analizi"];
   const RECOVERY_TARGET: Record<string, number> = { "Soru çözümü": 18, Tekrar: 15, "Konu anlatımı": 0, "Yanlış analizi": 12 };
+  // Eksik kapatma türünü GÜN + KONUYA göre seçer. Aynı başarısız konuya her gün
+  // aynı görevi (ör. 25 soruluk "Tekrar") yazmak yerine tür döner; böylece
+  // öğrenci soru çözümü → tekrar → konu anlatımı → yanlış analizi döngüsünden
+  // geçer (kullanıcı kuralı 6). Gün indeksi her gün bir sonraki türe geçirir;
+  // konu bazlı ofset aynı gün farklı konuların türlerini ayırır.
+  const recoveryKindFor = (exam: string, subject: string, topic: string): PlanSlot["kind"] => {
+    const dayIdx = Math.round(daysBetween(settings.programStart || today, today));
+    const seed = [...`${exam}|${subject}|${topic}`].reduce((a, c) => a + c.charCodeAt(0), 0);
+    const n = RECOVERY_KINDS.length;
+    return RECOVERY_KINDS[((dayIdx + seed) % n + n) % n];
+  };
   // Öğrencinin hangi alt konuda / hangi hata türünde zorlandığını özetler.
   const struggleOf = (exam: string, subject: string, topic: string) => {
     const ws = wrongs.filter((w) => w.exam === exam && w.subject === subject && w.topic === topic);
@@ -992,6 +1003,12 @@ export function buildDailyPlan(
   const awaitingPractice = startedRows
     .filter((r) => (r.total ?? 0) === 0)
     .sort((a, b) => (a.lastStudy || "").localeCompare(b.lastStudy || ""));
+  // Eksik kapatma hedefi: başlamış ama HENÜZ öğrenilmemiş (başarı < %70)
+  // konular. Bu konulara her gün AYNI görev yazılmaz; tür rotasyona bağlanır.
+  const recoveryRows = startedRows
+    .filter((r) => (r.total ?? 0) > 0 && r.success != null && r.success < 0.7)
+    .sort((a, b) => (a.success ?? 0) - (b.success ?? 0));
+  const recoveryKeys = new Set(recoveryRows.map((r) => `${r.exam}|${r.subject}|${r.topic}`));
 
   let newCount = 0;
   let tytNew = 0;
@@ -1084,15 +1101,23 @@ export function buildDailyPlan(
     if (tasks.filter((t) => t.kind === "Tekrar").length >= 3) break;
     if (reviewMinutes + mins > split.reviewCap) break;
     if (tasks.some((t) => t.topic === r.topic && t.subject === r.subject)) continue;
+    // Öğrenilmemiş konu "Tekrar"a kilitlenmesin: tür güne göre döner ve görev
+    // eksik kapatma olarak işaretlenir (kullanıcı kuralı 6). Aksi hâlde aynı
+    // "Tekrar" her gün tekrarlanıp rotasyon (konu anlatımı/yanlış analizi) hiç
+    // devreye girmiyordu (ölçüm: takılı konuya 12 gün üst üste aynı "Tekrar").
+    const isRecovery = recoveryKeys.has(`${r.exam}|${r.subject}|${r.topic}`);
+    const kind = isRecovery ? recoveryKindFor(r.exam, r.subject, r.topic) : "Tekrar";
     tasks.push({
       exam: r.exam,
       subject: r.subject,
       topic: r.topic,
-      kind: "Tekrar",
-      targetQ: r.suggestedQ,
-      minutes: mins,
+      kind,
+      targetQ: isRecovery ? RECOVERY_TARGET[kind] : r.suggestedQ,
+      minutes: isRecovery && kind === "Yanlış analizi" ? 40 : mins,
       priority: r.health === "kritik" ? "yüksek" : "orta",
-      reason: r.reason,
+      reason: isRecovery
+        ? `Eksik kapatma turu: ${kind} (akıllı durum: ${r.health}).`
+        : r.reason,
       tier: 2,
     });
     reviewMinutes += mins;
@@ -1100,26 +1125,12 @@ export function buildDailyPlan(
 
   // 3. geçiş: başlanmış ama HENÜZ öğrenilmemiş konuların eksik kapatma işleri.
   //
-  // Öğrenilmemiş konu "Bitti" sayılmaz (15 soru + %70 korunur). Bu konular için
-  // her gün AYNI 18 soruluk görevi üretmek yerine görev türü rotasyona bağlanır:
-  // tur sayısı (çözülen soru / 15) arttıkça sıradaki tür seçilir, böylece
-  // soru çözümü → tekrar → anlatıma dönüş → yanlış analizi döner. Yalnızca
-  // başarısı %70'in altında kalan konular bu geçişe girer; "iyi" konular girmez.
-  const recoveryRows = interleaveBySubject(
-    startedRows
-      .filter((r) => (r.total ?? 0) > 0 && r.success != null && r.success < 0.7)
-      .sort((a, b) => (a.success ?? 0) - (b.success ?? 0)),
-  );
-  for (const r of recoveryRows) {
-    // Tur seçimi GÜNE ve konuya bağlıdır; `total/15` gibi soru sayısına bağlamak
-    // yanlıştı: "Konu anlatımı" görevi soru eklemediği için tur ilerlemiyor ve
-    // aynı görev her gün tekrarlanıyordu (ölçüm: aynı 3 "Konu anlatımı" görevi
-    // 13 gün üst üste). Gün indeksi her gün bir sonraki türe geçer; konu bazlı
-    // ofset ile aynı gün farklı konular farklı tür alır.
-    const dayIdx = Math.round(daysBetween(settings.programStart || today, today));
-    const topicSeed = [...`${r.exam}|${r.subject}|${r.topic}`].reduce((a, c) => a + c.charCodeAt(0), 0);
-    const round = ((dayIdx + topicSeed) % RECOVERY_KINDS.length + RECOVERY_KINDS.length) % RECOVERY_KINDS.length;
-    const kind = RECOVERY_KINDS[round];
+  // Öğrenilmemiş konu "Bitti" sayılmaz (15 soru + %70 korunur). Bu konular
+  // normalde 2. geçişte (SRS) rotasyonlu türle zaten işlenir; buradaki geçiş
+  // tekrar tavanı veya bütçe nedeniyle dışarıda kalanlar için yedektir (aynı
+  // konu iki kez eklenmez). Yalnızca başarısı %70'in altındaki konular girer.
+  for (const r of interleaveBySubject(recoveryRows)) {
+    const kind = recoveryKindFor(r.exam, r.subject, r.topic);
     const st = struggleOf(r.exam, r.subject, r.topic);
     const detail = st ? ` Alt konu: ${st.subtopic || "-"}, hata: ${st.reason || "-"}` : "";
     addTask(r, kind, {
