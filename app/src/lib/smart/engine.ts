@@ -2,6 +2,7 @@ import { frequencyScore, frequencyTier, DISTRIBUTION } from "@/data/distribution
 import { aytMockReady, aytUnlocks, isGaranti, tytMockReady } from "@/data/roadmap";
 import { buildTimeline, isCoreTopic, isOngoingTopic, orderAllowed, orderBoost, phaseFor } from "@/data/sequence";
 import { countsIssue, n, pctOf, sanitizeCounts } from "@/lib/calc";
+import { MIN_QUESTIONS_FOR_MASTERED } from "@/lib/smart/progress";
 import { splitBudget, capacity, dailyCapacity, type DayLoad } from "@/lib/smart/budget";
 import { topicAggregates, aytNets, tytNets, dailyTotals } from "@/lib/stats";
 import type { AytExam, DailyRow, TopicRow, TytExam, WrongRow } from "@/lib/types";
@@ -698,7 +699,7 @@ export function buildDailyPlan(
     life: true,
   }));
 
-  const tasks: Omit<PlanSlot, "id" | "start" | "end">[] = [];
+  const tasks: (Omit<PlanSlot, "id" | "start" | "end"> & { tier?: number })[] = [];
 
   // Deneme günü: kullanıcı seçimi + yoğun fazlarda hafta ortası ek deneme.
   const extraMockDay = phase.mockIntensity >= 2 && weekday === 3;
@@ -798,15 +799,48 @@ export function buildDailyPlan(
     practiceSlots: sunday ? 0 : Math.max(1, Math.min(2, pace.perDay - 1)),
   });
   const used2 = new Set<string>();
-  // Sert sıra için "tamamlanmış" küme. Kullanıcı kuralı: aynı derste önceki
-  // yeni konu BİTMEDEN (en az 15 soru + %70) sonraki yeni konuya geçilmez.
-  // Önceden bu küme "başlanmış" idi; bu yüzden bir konu anlatılır anlatılmaz
-  // aynı derste bir sonraki konu açılıyor ve ilk konunun pratiği haftalarca
-  // sarkıyordu. SRS tekrarları bu kuralın dışındadır (kendi geçişinde eklenir).
-  const completed = new Set<string>(
-    topics.filter((t) => t.status === "Bitti").map((t) => `${t.exam}|${t.subject}|${t.topic}`),
+  // İlerleme kapısı (sert sıra) için "hazır" küme. Kullanıcı kuralı: aynı derste
+  // önceki konunun TEMEL SORU ÇÖZÜMÜ bitmeden sonraki yeni konuya geçilmez.
+  //
+  // ÖNEMLİ: Kapı "Öğrenildi" (15 soru + %70) DEĞİL, "temel soru çözümü yapıldı"
+  // (>= 15 soru) seviyesidir. Önceden yalnızca status === "Bitti" kabul ediliyordu;
+  // "Bitti" ise %70 başarı şartına bağlı. Başarısı kalıcı olarak %70 altında kalan
+  // bir öğrencide hiçbir konu "Bitti" olamıyor, dolayısıyla her dersin yalnızca
+  // ilk konusu açılıp program 10. günde tamamen kilitleniyordu (ölçüm: 186 konudan
+  // 10'u başlıyor, 0'ı bitiyor). %70 eşiği "Öğrenildi" etiketi için KORUNUR
+  // (`progress.ts`); yalnızca sıradaki konuya geçiş kapısı pratik tamamlanmasına
+  // bağlanır. Yeterli pratiği olup %70'e ulaşamayan konu "Bitti" sayılmaz ve
+  // eksik kapatma rotasyonunda (3. geçiş) çalışmaya devam eder.
+  const progressionReady = new Set<string>(
+    topics
+      .filter((t) => t.status === "Bitti" || (t.total ?? 0) >= MIN_QUESTIONS_FOR_MASTERED)
+      .map((t) => `${t.exam}|${t.subject}|${t.topic}`),
   );
-  const addTask = (r: (typeof ranked)[number], kindOverride?: string): boolean => {
+  // Eksik kapatma rotasyonu: takılı bir konu için sırayla uygulanan görev
+  // türleri. Aynı görevi (ör. her gün 18 soru) tekrar üretmek yerine konu
+  // anlatımı → tekrar → anlatıma dönüş → yanlış analizi döner. Deneme sayısı
+  // çözülen soru miktarından (total/15) tahmin edilir; her oturum >=15 soru ekler.
+  const RECOVERY_KINDS: PlanSlot["kind"][] = ["Soru çözümü", "Tekrar", "Konu anlatımı", "Yanlış analizi"];
+  const RECOVERY_TARGET: Record<string, number> = { "Soru çözümü": 18, Tekrar: 15, "Konu anlatımı": 0, "Yanlış analizi": 12 };
+  // Öğrencinin hangi alt konuda / hangi hata türünde zorlandığını özetler.
+  const struggleOf = (exam: string, subject: string, topic: string) => {
+    const ws = wrongs.filter((w) => w.exam === exam && w.subject === subject && w.topic === topic);
+    if (!ws.length) return null;
+    const tally = (pick: (w: (typeof ws)[number]) => string) => {
+      const m = new Map<string, number>();
+      for (const w of ws) {
+        const k = pick(w);
+        if (k) m.set(k, (m.get(k) ?? 0) + 1);
+      }
+      return [...m.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+    };
+    return { count: ws.length, subtopic: tally((w) => w.subtopic), reason: tally((w) => w.reason) };
+  };
+  const addTask = (
+    r: (typeof ranked)[number],
+    kindOverride?: string,
+    opts?: { targetQ?: number; minutes?: number; reason?: string; tier?: number },
+  ): boolean => {
     if (tasks.length > (sunday ? 5 : 8)) return false;
     if (tasks.some((t) => t.topic === r.topic && t.subject === r.subject)) return false;
     const isNew = r.status === "Başlamadım";
@@ -820,7 +854,7 @@ export function buildDailyPlan(
     // Sert ön koşul: AYT kapısı kapalıysa konu hiç açılmaz (yumuşak ceza yeterli değil).
     if (isNew && !r.aytOpen) return false;
     // Sert sıra: ders içinde önceki konular başlamadan bu konu açılmaz.
-    if (isNew && !orderAllowed(r.exam, r.subject, r.topic, completed)) return false;
+    if (isNew && !orderAllowed(r.exam, r.subject, r.topic, progressionReady)) return false;
     // Tamamlanmış konuya yeni "Soru çözümü" görevi yazılmaz. Bitmiş konunun
     // bakımı tekrar (SRS) görevleriyle yapılır; yoksa aynı konu her gün
     // tekrar tekrar soru görevi alıp yeni konuların önünü kesiyordu.
@@ -830,10 +864,11 @@ export function buildDailyPlan(
       subject: r.subject,
       topic: r.topic,
       kind: (kindOverride ?? (isNew ? "Konu anlatımı" : "Soru çözümü")) as PlanSlot["kind"],
-      targetQ: r.health === "bos" ? 0 : r.health === "kritik" ? 25 : 18,
-      minutes: 55,
+      targetQ: opts?.targetQ ?? (r.health === "bos" ? 0 : r.health === "kritik" ? 25 : 18),
+      minutes: opts?.minutes ?? 55,
       priority: r.priority > 0.7 ? "yüksek" : r.priority > 0.45 ? "orta" : "düşük",
-      reason: r.reasons[0] || "Öncelik sırası",
+      reason: opts?.reason ?? (r.reasons[0] || "Öncelik sırası"),
+      tier: opts?.tier ?? (isNew ? 0 : 2),
     });
     used2.add(`${r.exam}|${r.subject}|${r.topic}`);
     return true;
@@ -869,7 +904,7 @@ export function buildDailyPlan(
   // seçilir; aksi hâlde ders aylarca başlamıyordu.
   const aytQueues = orderedSubjects.map((subject) => {
     const list = aytBySubject.get(subject)!;
-    const first = list.find((r) => orderAllowed(r.exam, r.subject, r.topic, completed));
+    const first = list.find((r) => orderAllowed(r.exam, r.subject, r.topic, progressionReady));
     return first ? [first, ...list.filter((r) => r !== first)] : list;
   });
   const aytInterleaved: (typeof ranked)[number][] = [];
@@ -903,7 +938,7 @@ export function buildDailyPlan(
   const tytQueues = new Map<string, (typeof ranked)[number][]>();
   for (const subject of tytBySubject.keys()) {
     const list = tytBySubject.get(subject)!;
-    const first = list.find((r) => orderAllowed(r.exam, r.subject, r.topic, completed));
+    const first = list.find((r) => orderAllowed(r.exam, r.subject, r.topic, progressionReady));
     tytQueues.set(subject, first ? [first, ...list.filter((r) => r !== first)] : list);
   }
   const tytOrdered: (typeof ranked)[number][] = [];
@@ -956,16 +991,45 @@ export function buildDailyPlan(
   let newCount = 0;
   let tytNew = 0;
   let aytNew = 0;
-  // Pratik birikimi (backlog) varken yeni konu sayısı kısılır. Ölçüm: günde
-  // ~2 yeni konu açılıp gün ~6 göreve (~330 dk) sığdığı için anlatılan konuların
-  // pratiği haftalarca gecikiyordu (3 konu 16 gün bekledi). Birikim belirgin
-  // olduğunda yeni anlatım tamamen durur, birikim erir; sonra normale döner.
-  const newLimit = awaitingPractice.length >= 4 ? 0 : awaitingPractice.length >= 2 ? 1 : pace.perDay;
+  // Dersler arasında dönüşümlü dağıtım yardımcıcı: bir dersin birikimi tüm günü
+  // doldurmasın, eksik kapatma farklı derslere dengeli yayılsın.
+  const interleaveBySubject = <T extends { exam: string; subject: string }>(rows: T[]): T[] => {
+    const groups = new Map<string, T[]>();
+    for (const r of rows) {
+      const k = `${r.exam}|${r.subject}`;
+      const list = groups.get(k);
+      if (list) list.push(r);
+      else groups.set(k, [r]);
+    }
+    const out: T[] = [];
+    for (let more = true; more; ) {
+      more = false;
+      for (const list of groups.values()) {
+        const next = list.shift();
+        if (next) {
+          out.push(next);
+          more = true;
+        }
+      }
+    }
+    return out;
+  };
+  // Pratik birikimi, yeni konu açılışını DERS BAZINDA kısar.
+  // Kısıt GLOBAL değil: yalnızca pratiği birikmiş dersin yeni konusu yavaşlar;
+  // bağımsız dersler ilerlemeye devam eder. Önceki global kilit, tek bir dersin
+  // birikimiyle tüm programı (10 Kasım'da) donduruyordu.
+  const awaitingBySubject = new Map<string, number>();
+  for (const r of awaitingPractice) {
+    const k = `${r.exam}|${r.subject}`;
+    awaitingBySubject.set(k, (awaitingBySubject.get(k) ?? 0) + 1);
+  }
   for (const r of newCandidates) {
-    if (newCount >= newLimit) break;
+    if (newCount >= pace.perDay) break;
     const isTyt = r.exam === "TYT";
     if (isTyt && tytNew >= pace.tytPerDay) continue;
     if (!isTyt && aytNew >= pace.aytPerDay) continue;
+    // Ders kendi pratiğini biriktirdiyse (>=2 bekleyen) yeni konusunu açmaz.
+    if ((awaitingBySubject.get(`${r.exam}|${r.subject}`) ?? 0) >= 2) continue;
     if (addTask(r)) {
       newCount += 1;
       if (isTyt) tytNew += 1;
@@ -979,10 +1043,10 @@ export function buildDailyPlan(
   // ÖNCE gelir. Aksi hâlde taze bir konunun pratiği, daha önce anlatılmış bir
   // konunun pratiğinin önüne geçiyor ve o konu haftalarca bekliyordu; ölçüm:
   // Kimyanın Temel Kanunları 25.11.2026'da anlatıldı, pratiği 18.01.2027'de
-  // yapıldı (54 gün). Sıra FIFO'dur (en eski bekleyen önce); böylece her konu
-  // kesintisiz tamamlanır ve birikim (backlog) erir. SRS tekrarları kendi payını
-  // yine alır.
-  for (const r of awaitingPractice) addTask(r);
+  // yapıldı (54 gün). Sıra FIFO'dur (en eski bekleyen önce); dersler arasında
+  // dönüşümlü dağıtılır ki bir dersin birikimi günü doldurmasın. Katman 0'dır
+  // (yeni konuyla aynı): başlanmış işi bitirmek, yeni konu açmak kadar önceliklidir.
+  for (const r of interleaveBySubject(awaitingPractice)) addTask(r, undefined, { tier: 0 });
 
   // 1.25 geçiş: KISA konuların pratiğini aynı gün tamamla.
   //
@@ -1004,6 +1068,7 @@ export function buildDailyPlan(
       minutes: 55,
       priority: "orta",
       reason: "Kısa konu: anlatımla aynı gün tamamlanır",
+      tier: 0,
     });
   }
 
@@ -1023,14 +1088,34 @@ export function buildDailyPlan(
       minutes: mins,
       priority: r.health === "kritik" ? "yüksek" : "orta",
       reason: r.reason,
+      tier: 2,
     });
     reviewMinutes += mins;
   }
 
-  // 3. geçiş: kalan başlanmış konuların soru çözümü ve eksik kapatma işleri.
-  for (const r of startedRows) {
-    if ((r.total ?? 0) === 0) continue; // taze pratik 1.5 geçişte eklendi
-    addTask(r);
+  // 3. geçiş: başlanmış ama HENÜZ öğrenilmemiş konuların eksik kapatma işleri.
+  //
+  // Öğrenilmemiş konu "Bitti" sayılmaz (15 soru + %70 korunur). Bu konular için
+  // her gün AYNI 18 soruluk görevi üretmek yerine görev türü rotasyona bağlanır:
+  // tur sayısı (çözülen soru / 15) arttıkça sıradaki tür seçilir, böylece
+  // soru çözümü → tekrar → anlatıma dönüş → yanlış analizi döner. Yalnızca
+  // başarısı %70'in altında kalan konular bu geçişe girer; "iyi" konular girmez.
+  const recoveryRows = interleaveBySubject(
+    startedRows
+      .filter((r) => (r.total ?? 0) > 0 && r.success != null && r.success < 0.7)
+      .sort((a, b) => (a.success ?? 0) - (b.success ?? 0)),
+  );
+  for (const r of recoveryRows) {
+    const attempts = Math.floor((r.total ?? 0) / 15);
+    const kind = RECOVERY_KINDS[attempts % RECOVERY_KINDS.length];
+    const st = struggleOf(r.exam, r.subject, r.topic);
+    const detail = st ? ` Alt konu: ${st.subtopic || "-"}, hata: ${st.reason || "-"}` : "";
+    addTask(r, kind, {
+      targetQ: RECOVERY_TARGET[kind],
+      minutes: kind === "Konu anlatımı" ? 55 : kind === "Yanlış analizi" ? 40 : 55,
+      reason: `${attempts + 1}. eksik kapatma turu: ${kind} (başarı %${Math.round((r.success ?? 0) * 100)}).${detail}`,
+      tier: 3,
+    });
   }
 
   const windows = freeWindows(settings, weekday);
@@ -1042,8 +1127,9 @@ export function buildDailyPlan(
       const task = tasks[ti];
       const dur = Math.min(task.minutes, w.end - cursor, budget - used);
       if (dur < 35) break;
+      const { tier: _tier, ...slot } = task;
       slots.push({
-        ...task,
+        ...slot,
         id: uid(),
         start: fromMin(cursor),
         end: fromMin(cursor + dur),
@@ -1053,6 +1139,38 @@ export function buildDailyPlan(
       cursor += dur + 10;
       ti += 1;
     }
+  }
+  // Ders geçişlerini azalt: yerleşen görevleri DERS BLOĞU olarak yeniden sırala.
+  //
+  // Görevler yukarıda öncelik sırasına göre yerleştirilir; bu yüzden aynı gün
+  // aynı dersin anlatım/pratik/tekrar işleri gün boyunca dağılıyor ve sürekli
+  // ders değişiyordu (ölçüm: gün başına ortalama 2,9 geçiş, en kötü 6). Burada
+  // YALNIZCA içerik sırası değişir: hangi görevlerin yerleştiği (dolayısıyla
+  // bütçe/kesme davranışı) aynı kalır. Zaman pencereleri korunur; içerik sırası
+  // değişince start/end dakikaları da pencerelere göre yeniden atanır, böylece
+  // program kesintisiz ve zaman sıralı kalır (ölçüm: ortalama 2,0 geçiş, en kötü 4).
+  // Rutin görevler (Paragraf/Problemler) günün başında korunur.
+  {
+    const isRoutine = (s: PlanSlot) =>
+      !s.exam || s.topic === "Paragraf" || s.topic === "Problemler";
+    const routines = slots.filter(isRoutine);
+    const groups = new Map<string, PlanSlot[]>();
+    for (const s of slots) {
+      if (isRoutine(s)) continue;
+      const k = `${s.exam}|${s.subject}`;
+      const list = groups.get(k);
+      if (list) list.push(s);
+      else groups.set(k, [s]);
+    }
+    const ordered = [...routines, ...[...groups.values()].flat()];
+    const windowsList = slots.map((s) => ({ start: s.start, end: s.end, minutes: s.minutes }));
+    ordered.forEach((s, i) => {
+      s.start = windowsList[i].start;
+      s.end = windowsList[i].end;
+      s.minutes = windowsList[i].minutes;
+    });
+    slots.length = 0;
+    slots.push(...ordered);
   }
   return { slots, life };
 }
