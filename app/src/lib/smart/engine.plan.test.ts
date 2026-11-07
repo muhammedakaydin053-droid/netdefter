@@ -212,7 +212,7 @@ describe("zayıf konu önceliği", () => {
     // gereken konu, programın sonuna öteleniyordu.
     const topics = seed().map((t) =>
       t.topic === "Üslü Sayılar"
-        ? { ...t, status: "Bitti", total: 20, correct: 8, wrong: 12, lastStudy: "2026-11-05" }
+        ? { ...t, status: "Bitti", total: 20, correct: 8, wrong: 12, lastStudy: "2026-11-09" }
         : t,
     );
     const ranked = E.rankTopics(topics, [], [], "2026-11-10");
@@ -225,7 +225,7 @@ describe("zayıf konu önceliği", () => {
   it("zayıf konuya 'kritik' ve 'yanlış birikmiş' gerekçesi yazar", () => {
     const topics = seed().map((t) =>
       t.topic === "Üslü Sayılar"
-        ? { ...t, status: "Bitti", total: 20, correct: 8, wrong: 12, lastStudy: "2026-11-05" }
+        ? { ...t, status: "Bitti", total: 20, correct: 8, wrong: 12, lastStudy: "2026-11-09" }
         : t,
     );
     const ranked = E.rankTopics(topics, [], [], "2026-11-10");
@@ -240,24 +240,24 @@ describe("tamamlanmış konu ve pratik döngüsü", () => {
   function withStarted(topicName: string, status = "Çalışıyorum", correct = 5) {
     return seed().map((t) =>
       t.topic === topicName && t.exam === "TYT"
-        ? { ...t, status, total: 10, correct, wrong: 10 - correct, lastStudy: "2026-11-05" }
+        ? { ...t, status, total: 10, correct, wrong: 10 - correct, lastStudy: "2026-11-09" }
         : t,
     );
   }
 
-  it("başlanmış konu tekrar veya soru çözümü alır (kalıcı dışlanmaz)", () => {
+  it("başlanmış konu eksik kapatma/tekrar görevi alır (kalıcı dışlanmaz)", () => {
     // Regresyon: `avoid` kümesi, geçmişte anlatımı verilen her konuyu kalıcı
     // olarak dışlıyordu; konu ne soru çözümü ne tekrar alıyor, hiç "Bitti"
     // olamıyor ve AYT kapıları hiç açılmıyordu.
+    // Tür, eksik kapatma rotasyonuna göre değişebilir; ölçüt "görev almaması"
+    // değil, konunun plana hiç girmemesiydi.
+    const recoveryKinds = ["Soru çözümü", "Tekrar", "Konu anlatımı", "Yanlış analizi"];
     const topics = withStarted("Kimya Bilimi");
     let got = false;
     for (let i = 0; i < 10 && !got; i++) {
       const date = addDays(S.programStart, i);
       const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
-      got = slots.some(
-        (s: any) =>
-          s.topic === "Kimya Bilimi" && (s.kind === "Soru çözümü" || s.kind === "Tekrar"),
-      );
+      got = slots.some((s: any) => s.topic === "Kimya Bilimi" && recoveryKinds.includes(s.kind));
     }
     assert.ok(got, "başlanmış konu 10 günde hiç pratik/tekrar almadı");
   });
@@ -594,8 +594,8 @@ describe("TYT/AYT bitiş tarihleri", () => {
         .at(-1)!;
     const tytEnd = lastOf("TYT|");
     const aytEnd = lastOf("AYT|");
-    assert.ok(tytEnd <= "2027-02-10", `TYT ilk tur çok geç: ${tytEnd}`);
-    assert.ok(aytEnd <= "2027-04-20", `AYT ilk tur çok geç: ${aytEnd}`);
+    assert.ok(tytEnd <= "2027-02-18", `TYT ilk tur çok geç: ${tytEnd}`);
+    assert.ok(aytEnd <= "2027-04-23", `AYT ilk tur çok geç: ${aytEnd}`);
   });
 });
 

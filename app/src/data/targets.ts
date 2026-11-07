@@ -27,12 +27,12 @@ export interface Targets {
 }
 
 export const TARGETS: Targets = {
-  programStart: "2026-11-05",
-  tytRound1: "2027-02-04",
-  aytRound1: "2027-04-19",
-  aytFlex: "2027-05-03",
-  gapFill: "2027-05-13",
-  finalPeriod: "2027-05-13",
+  programStart: "2026-11-09",
+  tytRound1: "2027-02-08",
+  aytRound1: "2027-04-23",
+  aytFlex: "2027-05-07",
+  gapFill: "2027-05-17",
+  finalPeriod: "2027-05-17",
   tytExam: "2027-06-19",
   aytExam: "2027-06-20",
 };

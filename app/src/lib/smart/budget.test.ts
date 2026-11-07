@@ -149,6 +149,7 @@ describe("capacity", () => {
 describe("dailyCapacity — dönemsel kapasite eğrisi", () => {
   it("Kasım 330, Aralık 390, Ocak+ 480 döner", () => {
     assert.equal(dailyCapacity("2026-11-05", 240), 330);
+    assert.equal(dailyCapacity("2026-11-09", 240), 330);
     assert.equal(dailyCapacity("2026-12-15", 240), 390);
     assert.equal(dailyCapacity("2027-01-10", 240), 480);
     assert.equal(dailyCapacity("2027-05-20", 240), 480);

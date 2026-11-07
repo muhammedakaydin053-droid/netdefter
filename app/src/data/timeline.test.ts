@@ -36,7 +36,7 @@ describe("buildTimeline", () => {
     assert.ok(final);
     assert.equal(final.newTopics, false);
     // Son dönem hedefi (gapFill) ile sınav arası: 13 Mayıs – 19 Haziran.
-    assert.equal(final.from, "2027-05-13");
+    assert.equal(final.from, "2027-05-17");
     // deneme fazı da yeni konu açmaz
     assert.equal(timeline.at(-2)?.newTopics, false);
   });
@@ -44,7 +44,7 @@ describe("buildTimeline", () => {
   it("anchors phase boundaries to the user's target dates", () => {
     assert.deepEqual(
       timeline.map((p) => p.from),
-      ["2026-10-28", "2027-02-04", "2027-04-19", "2027-05-03", "2027-05-13"],
+      ["2026-10-28", "2027-02-08", "2027-04-23", "2027-05-07", "2027-05-17"],
     );
   });
 
