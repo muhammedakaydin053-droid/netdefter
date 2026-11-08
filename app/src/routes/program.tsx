@@ -33,8 +33,10 @@ function ProgramPage() {
   const clearCarry = useAppStore((s) => s.clearCarry);
   const replanProgram = useAppStore((s) => s.replanProgram);
   const { slots, life, analyzedWrongIds, branchMockSubject } = buildDailyPlan(topics, daily, wrongs, tytExams, aytExams, settings, carry, todayISO(), undefined, analyzedWrongs, branchMockHistory);
-  // Yanlış analizi görevleri üretildikten sonra kayıtları "analiz edildi" olarak
-  // işaretle; böylece ertesi gün aynı yanlış için mükerrer görev oluşmaz.
+  // Yalnızca kullanıcının bugün "Yanlış analizi" günlük kaydıyla GERÇEKTEN
+  // tamamladığı yanlışlar işaretlenir. Görev üretmek/yerleştirmek tek başına
+  // yeterli değildir; bu yüzden `analyzedWrongIds` artık tamamlanmış görevlerin
+  // kimliklerini taşır (bkz. `buildDailyPlan` sonu).
   useEffect(() => {
     if (analyzedWrongIds.length) markWrongsAnalyzed(analyzedWrongIds, todayISO());
     if (branchMockSubject) markBranchMock(branchMockSubject, todayISO());

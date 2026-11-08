@@ -27,6 +27,10 @@ export interface BackupData {
   daily: DailyRow[];
   settings: ScheduleSettings;
   carry: CarryItem[];
+  /** Yanlış kaydı kimliği → analiz edildiği tarih. */
+  analyzedWrongs: Record<string, string>;
+  /** `exam|subject` → son branş denemesi tarihi. */
+  branchMockHistory: Record<string, string>;
 }
 
 export interface BackupFile {
@@ -35,6 +39,14 @@ export interface BackupFile {
   exportedAt: string;
   app: "NetDefter";
   data: BackupData;
+}
+
+/** Bir nesne alanı: nesne değilse boş nesne. Eski yedek uyumluluğu için. */
+function asRecord(v: unknown): Record<string, string> {
+  if (!isObject(v)) return {};
+  const out: Record<string, string> = {};
+  for (const [k, val] of Object.entries(v)) if (typeof val === "string") out[k] = val;
+  return out;
 }
 
 /** Kaynak durumdan (store state veya DataSnapshot) yedek verisini çıkarır. */
@@ -48,6 +60,8 @@ export function toBackupData(s: BackupData): BackupData {
     daily: s.daily ?? [],
     settings: s.settings,
     carry: s.carry ?? [],
+    analyzedWrongs: s.analyzedWrongs ?? {},
+    branchMockHistory: s.branchMockHistory ?? {},
   };
 }
 
@@ -156,6 +170,8 @@ export function parseBackup(raw: string): ParseResult {
       daily: asArray<DailyRow>(data.daily),
       settings,
       carry: asArray<CarryItem>(data.carry),
+      analyzedWrongs: asRecord(data.analyzedWrongs),
+      branchMockHistory: asRecord(data.branchMockHistory),
     },
   };
 }

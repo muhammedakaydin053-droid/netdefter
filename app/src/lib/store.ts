@@ -92,6 +92,10 @@ export interface DataSnapshot {
   daily: DailyRow[];
   settings: ScheduleSettings;
   carry: CarryItem[];
+  /** Yanlış kaydı kimliği → analiz edildiği tarih. */
+  analyzedWrongs: Record<string, string>;
+  /** `exam|subject` → son branş denemesi tarihi. */
+  branchMockHistory: Record<string, string>;
 }
 
 export interface AppState {
@@ -147,6 +151,8 @@ function snapshot(s: AppState): DataSnapshot {
     daily: s.daily,
     settings: s.settings,
     carry: s.carry,
+    analyzedWrongs: s.analyzedWrongs,
+    branchMockHistory: s.branchMockHistory,
   };
 }
 
@@ -365,6 +371,11 @@ export const useAppStore = create<AppState>()(
           aytExams: [],
           daily: [],
           carry: [],
+          // Yanlışlar ve denemeler silindiğine göre bunlara bağlı analiz/rotasyon
+          // işaretleri de temizlenir; aksi hâlde yeni kayıtlar eski işaretlere
+          // takılırdı. `backup` sayesinde geri alınabilir.
+          analyzedWrongs: {},
+          branchMockHistory: {},
           lastAiComment: null,
           settings: { ...s.settings, programStart: todayISO() },
         });
@@ -382,6 +393,11 @@ export const useAppStore = create<AppState>()(
           daily: b.daily,
           settings: { ...DEFAULT_SETTINGS, ...b.settings },
           carry: b.carry,
+          // Yedek, işaretleri de taşır. Eski (alanı olmayan) bir yedekten
+          // dönülüyorsa güvenli varsayılan: boş nesne. Böylece geri yükleme
+          // sonrası eski kayıtlardan kalan işaretler yeni duruma sızmaz.
+          analyzedWrongs: b.analyzedWrongs ?? {},
+          branchMockHistory: b.branchMockHistory ?? {},
         });
       },
 
@@ -417,6 +433,11 @@ export const useAppStore = create<AppState>()(
           daily: data.daily ?? [],
           settings: { ...DEFAULT_SETTINGS, ...data.settings },
           carry: data.carry ?? [],
+          // Eski sürüm yedeklerinde bu alanlar yoktur; güvenli varsayılan boş
+          // nesnedir. Yedekte varsa aynen geri yüklenir, yoksa eski işaretler
+          // taşınmaz (yeni yedek üzerine eski durum sızmaz).
+          analyzedWrongs: data.analyzedWrongs ?? {},
+          branchMockHistory: data.branchMockHistory ?? {},
         });
       },
       setAiComment: (text) => set({ lastAiComment: { at: new Date().toISOString(), text } }),

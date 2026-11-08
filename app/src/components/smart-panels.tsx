@@ -20,6 +20,8 @@ export function TodayPlanPanel() {
   const branchMockHistory = useAppStore((s) => s.branchMockHistory);
   const markBranchMock = useAppStore((s) => s.markBranchMock);
   const { slots, analyzedWrongIds, branchMockSubject } = buildDailyPlan(topics, daily, wrongs, tytExams, aytExams, settings, carry, todayISO(), undefined, analyzedWrongs, branchMockHistory);
+  // `analyzedWrongIds` yalnızca bugün tamamlanmış (günlük kaydı girilmiş) yanlış
+  // analizi görevlerini taşır; üretim/yerleşim tek başına işaretlemez.
   useEffect(() => {
     if (analyzedWrongIds.length) markWrongsAnalyzed(analyzedWrongIds, todayISO());
     if (branchMockSubject) markBranchMock(branchMockSubject, todayISO());

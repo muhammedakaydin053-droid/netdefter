@@ -828,9 +828,15 @@ export function buildDailyPlan(
   // yerine geçmez. Her yanlış kaydı en fazla BİR kez analiz edilir:
   // `analyzedWrongs[id]` o yanlışın analiz edildiği günü tutar. Kayıt DAHA ÖNCEKİ
   // bir günde analiz edildiyse tekrar üretilmez; BUGÜN analiz edildiyse aynı gün
-  // görünmeye devam eder (ekran yenilenince görev kaybolmaz). Kapasite nedeniyle
-  // ertelenen yanlış işaretlenmez ve kaybolmaz. Pencere 7 gündür; `result` dolu
-  // (kullanıcı kapatmış) yanlışlar analiz edilmez. Günde en fazla 2 KONU grubu.
+  // görünmeye devam eder (ekran yenilenince görev kaybolmaz). Pencere 7 gündür;
+  // `result` dolu (kullanıcı kapatmış) yanlışlar analiz edilmez. Günde en fazla
+  // 2 KONU grubu.
+  //
+  // İŞARETLEME BURADA YAPILMAZ. Görevin üretilmesi veya plana yerleşmesi tek
+  // başına yanlışları "analiz edildi" saymaz; aksi hâlde kapasite nedeniyle
+  // yerleşmeyen görevlerin yanlışları kaybolurdu. İşaretleme, dönen
+  // `analyzedWrongIds` üzerinden ve YALNIZCA kullanıcı bugün o konuda
+  // "Yanlış analizi" günlük kaydı girdiğinde yapılır (bkz. fonksiyon sonu).
   const analyzed = analyzedWrongs ?? {};
   const pendingWrongs = wrongs.filter(
     (w) =>
@@ -847,7 +853,6 @@ export function buildDailyPlan(
     list.push(w);
     wrongByTopic.set(key, list);
   }
-  const analyzedWrongIds: string[] = [];
   const analyzedTopics: { exam: string; subject: string; topic: string }[] = [];
   let wrongTasks = 0;
   for (const [key, list] of [...wrongByTopic.entries()].sort((a, b) => b[1].length - a[1].length)) {
@@ -872,10 +877,27 @@ export function buildDailyPlan(
       reason: `Son 7 günde ${list.length} yanlış — ${subject}/${topic}${detail ? ` (${detail})` : ""}`,
       wrongIds: list.map((w) => w.id),
     });
-    analyzedWrongIds.push(...list.map((w) => w.id));
     analyzedTopics.push({ exam, subject, topic });
     fixedMinutes += 40;
     wrongTasks += 1;
+  }
+
+  // Tamamlanma kapısı. Bir yanlış, YALNIZCA kullanıcı bugün o konu için
+  // "Yanlış analizi" günlük kaydı girdiğinde (mevcut görev tamamlama mekanizması)
+  // analiz edilmiş sayılır. Görevin üretilmesi veya plana yerleşmesi tek başına
+  // yeterli DEĞİLDİR: kapasite yüzünden yerleşmeyen ya da yerleşip de
+  // tamamlanmayan görevin yanlışları kaybolmaz, sonraki günlerde yeniden
+  // görevlendirilir. Dönüş yalnızca bu tamamlanmış görevlerin kimliklerini taşır;
+  // çağıran taraf `markWrongsAnalyzed` ile kalıcılaştırır.
+  const completedToday = new Set(
+    daily
+      .filter((d) => d.date === today && d.kind === "Yanlış analizi" && d.subject && d.topic)
+      .map((d) => `${d.subject}|${d.topic}`),
+  );
+  const analyzedWrongIds: string[] = [];
+  for (const t of tasks) {
+    if (t.kind !== "Yanlış analizi") continue;
+    if (completedToday.has(`${t.subject}|${t.topic}`)) analyzedWrongIds.push(...(t.wrongIds ?? []));
   }
 
   // Yanlış analizinin HEMEN ardından hedefli konu çalışması: analiz edilen her

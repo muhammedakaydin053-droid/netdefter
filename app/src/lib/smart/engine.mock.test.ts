@@ -258,15 +258,21 @@ describe("deneme ve yanlış analizi düzeltmeleri", () => {
       { id: "w1", date: "2026-11-20", exam: "TYT", subject: "Fizik", topic: "Kuvvet ve Hareket", subtopic: "Sürtünme", reason: "kavram", wrong: 3, note: "" },
       { id: "w2", date: "2026-11-20", exam: "TYT", subject: "Fizik", topic: "Kuvvet ve Hareket", subtopic: "Sürtünme", reason: "kavram", wrong: 2, note: "" },
     ];
-    const { slots, analyzedWrongIds } = E.buildDailyPlan(seed(), [], wrongs, [], [], S, [], "2026-11-21", new Set());
+    const day = "2026-11-21";
+    const { slots, analyzedWrongIds } = E.buildDailyPlan(seed(), [], wrongs, [], [], S, [], day, new Set());
     const wa = slots.find((s: any) => s.kind === "Yanlış analizi");
     assert.ok(wa, "yanlış analizi görevi üretilmedi");
     assert.equal(wa.topic, "Kuvvet ve Hareket", `görev konusu gerçek konu olmalı, bulunan: ${wa.topic}`);
     assert.ok(Array.isArray(wa.wrongIds) && wa.wrongIds.length === 2, "wrongIds yanlış kayıtlarına bağlanmadı");
-    assert.deepEqual([...analyzedWrongIds].sort(), ["w1", "w2"], "analiz edilen yanlış kimlikleri dönmedi");
+    // Görev ÜRETİLDİ ama kullanıcı henüz tamamlamadı → analiz edilmiş sayılmaz.
+    assert.equal(analyzedWrongIds.length, 0, "görev üretmek tek başına analiz sayılmamalı");
     // Hedefli çalışma: aynı konuya bağlı soru çözümü.
     const targeted = slots.find((s: any) => s.kind === "Soru çözümü" && s.topic === "Kuvvet ve Hareket" && s.reason?.includes("hedefli"));
     assert.ok(targeted, "yanlış analizi sonrası hedefli çalışma görevi yok");
+    // Kullanıcı görevi tamamladığında (günlük "Yanlış analizi" kaydı) işaretlenir.
+    const done = [{ id: "d1", date: day, subject: "Fizik", topic: "Kuvvet ve Hareket", kind: "Yanlış analizi", minutes: 40, questions: null, correct: null, wrong: null, note: "" }];
+    const r2 = E.buildDailyPlan(seed(), done, wrongs, [], [], S, [], day, new Set());
+    assert.deepEqual([...r2.analyzedWrongIds].sort(), ["w1", "w2"], "tamamlanan görevin yanlışları işaretlenmedi");
   });
 
   it("iki farklı konunun yanlışı ayrı kimliklerle korunur", () => {
@@ -280,22 +286,27 @@ describe("deneme ve yanlış analizi düzeltmeleri", () => {
     assert.deepEqual(topics, ["Kuvvet ve Hareket", "Problemler"], `konu kimlikleri ayrı korunmalı: ${topics}`);
   });
 
-  it("aynı yanlış kaydı iki farklı günde yeniden analiz edilmez", () => {
+  it("tamamlanan yanlış sonraki gün yeniden analiz edilmez", () => {
     const wrongs = [
       { id: "w1", date: "2026-11-20", exam: "TYT", subject: "Matematik", topic: "Problemler", subtopic: "", reason: "işlem", wrong: 2, note: "" },
       { id: "w2", date: "2026-11-20", exam: "TYT", subject: "Fizik", topic: "Kuvvet ve Hareket", subtopic: "", reason: "kavram", wrong: 2, note: "" },
     ];
     const day1 = "2026-11-21";
-    const r1 = E.buildDailyPlan(seed(), [], wrongs, [], [], S, [], day1, new Set());
-    assert.ok(r1.analyzedWrongIds.length > 0, "ilk gün analiz üretmedi");
+    // Kullanıcı 1. gün her iki görevi de tamamladı.
+    const done1 = [
+      { id: "d1", date: day1, subject: "Matematik", topic: "Problemler", kind: "Yanlış analizi", minutes: 40, questions: null, correct: null, wrong: null, note: "" },
+      { id: "d2", date: day1, subject: "Fizik", topic: "Kuvvet ve Hareket", kind: "Yanlış analizi", minutes: 40, questions: null, correct: null, wrong: null, note: "" },
+    ];
+    const r1 = E.buildDailyPlan(seed(), done1, wrongs, [], [], S, [], day1, new Set());
+    assert.deepEqual([...r1.analyzedWrongIds].sort(), ["w1", "w2"], "tamamlanan görevler işaretlenmedi");
     const marks: Record<string, string> = {};
     for (const id of r1.analyzedWrongIds) marks[id] = day1;
     // Aynı gün: işaretli olsa bile görev görünür (ekran yenilenince kaybolmaz).
-    const sameDay = E.buildDailyPlan(seed(), [], wrongs, [], [], S, [], day1, new Set(), marks);
-    assert.ok(sameDay.analyzedWrongIds.length > 0, "aynı gün görev kayboldu");
+    const sameDay = E.buildDailyPlan(seed(), done1, wrongs, [], [], S, [], day1, new Set(), marks);
+    assert.ok(sameDay.slots.some((s: any) => s.kind === "Yanlış analizi"), "aynı gün görev kayboldu");
     // Ertesi gün: işaretli yanlışlar için görev üretilmez.
     const nextDay = "2026-11-22";
     const r2 = E.buildDailyPlan(seed(), [], wrongs, [], [], S, [], nextDay, new Set(), marks);
-    assert.equal(r2.analyzedWrongIds.length, 0, `ertesi gün mükerrer analiz: ${r2.analyzedWrongIds}`);
+    assert.equal(r2.slots.filter((s: any) => s.kind === "Yanlış analizi").length, 0, "ertesi gün mükerrer analiz üretildi");
   });
 });
