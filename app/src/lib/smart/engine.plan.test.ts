@@ -1164,8 +1164,8 @@ describe("deneme günü yerleşimi", () => {
     for (let i = 0; i < days; i++) {
       const date = addDays(S.programStart, i);
       const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
-      const mocks = slots.filter((s) => s.kind === "Deneme");
-      if (mocks.length) out.push({ date, minutes: mocks.map((m) => m.minutes) });
+      const mocks = slots.filter((s: any) => s.kind === "Deneme");
+      if (mocks.length) out.push({ date, minutes: mocks.map((m: any) => m.minutes) });
       for (const sl of slots) {
         if (!sl.exam || sl.kind === "Deneme" || sl.kind === "Yanlış analizi") continue;
         if (sl.kind === "Konu anlatımı") {
@@ -1210,7 +1210,7 @@ describe("deneme günü yerleşimi", () => {
       const date = addDays(S.programStart, i);
       const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
       if (mockDates.has(date)) {
-        const lect = slots.filter((s) => s.kind === "Konu anlatımı");
+        const lect = slots.filter((s: any) => s.kind === "Konu anlatımı");
         assert.equal(lect.length, 0, `${date} deneme gününde ${lect.length} yeni anlatım açıldı`);
       }
       for (const sl of slots) {
@@ -1234,4 +1234,74 @@ describe("deneme günü yerleşimi", () => {
       }
     }
   });
+});
+
+/**
+ * Çoklu senaryo simülasyonu.
+ *
+ * Kullanıcı kuralı: motor tek bir "iyi" yolda değil, farklı başarı düzeylerinde
+ * de sağlam kalmalı. Senaryolar başarı oranı (soru doğruluğu) ile ayrışır;
+ * "karışık" ders bazında farklı oran uygular. Her senaryoda plan boş kalmamalı,
+ * yeni konu üretimi durmamalı ve ilerleme monoton olmalı.
+ */
+describe("çoklu senaryo simülasyonu", () => {
+  /** Senaryoyu gün gün işletip özet metrikleri toplar. */
+  function runScenario(acc: (exam: string, subject: string, day: number) => number, days: number) {
+    let topics = seed();
+    let emptyDays = 0;
+    let lectures = 0;
+    const lectDays = new Set<string>();
+    for (let i = 0; i < days; i++) {
+      const date = addDays(S.programStart, i);
+      const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
+      const academic = slots.filter((s: any) => s.exam && s.kind !== "Deneme" && s.kind !== "Yanlış analizi");
+      if (academic.length === 0) emptyDays += 1;
+      for (const sl of slots) {
+        if (!sl.exam || sl.kind === "Deneme" || sl.kind === "Yanlış analizi") continue;
+        if (sl.kind === "Konu anlatımı") {
+          lectures += 1;
+          lectDays.add(date);
+          topics = topics.map((t) =>
+            t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic && t.status === "Başlamadım"
+              ? { ...t, status: "Çalışıyorum", lastStudy: date }
+              : t,
+          );
+        } else {
+          const a = acc(sl.exam, sl.subject, i);
+          topics = topics.map((t) => {
+            if (!(t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic)) return t;
+            if (t.status === "Başlamadım") return t;
+            const q = Math.max(15, sl.targetQ || 15);
+            const total = (t.total ?? 0) + q;
+            const correct = (t.correct ?? 0) + Math.round(q * a);
+            return { ...t, total, correct, lastStudy: date, status: total >= 15 && correct / total >= 0.7 ? "Bitti" : t.status };
+          });
+        }
+      }
+    }
+    const mastered = topics.filter((t) => t.status === "Bitti").length;
+    return { emptyDays, lectures, lectDayCount: lectDays.size, mastered };
+  }
+
+  // Senaryolar %70 öğrenme eşiğinin ÜSTÜNDE tutulur: eşik altında konu hiç
+  // "Bitti" olmaz ve ilerleme kapısı kilitlenir — bu motorun DOĞRU davranışıdır
+  // ve ayrı bir describe'da ("öğrenme kapısı ve eksik kapatma") test edilir.
+  // Buradaki amaç farklı ders/başarı dağılımlarında planın tıkanmadığını
+  // doğrulamaktır.
+  const SCENARIOS: { name: string; acc: (e: string, s: string, d: number) => number }[] = [
+    { name: "yüksek (%78)", acc: () => 0.78 },
+    { name: "orta (%72)", acc: () => 0.72 },
+    { name: "toparlanan (%68→%80)", acc: (_e, _s, d) => Math.min(0.8, 0.68 + d / 600) },
+    { name: "karışık (ders bazlı)", acc: (_e, s) => (s === "Matematik" || s === "Fizik" ? 0.73 : 0.82) },
+  ];
+
+  for (const sc of SCENARIOS) {
+    it(`${sc.name}: plan boş kalmaz ve program tıkanmaz`, () => {
+      const r = runScenario(sc.acc, 180);
+      assert.equal(r.emptyDays, 0, `${sc.name}: ${r.emptyDays} boş akademik gün var`);
+      assert.ok(r.lectures >= 60, `${sc.name}: yeni anlatım çok az (${r.lectures})`);
+      assert.ok(r.lectDayCount >= 40, `${sc.name}: anlatım yapılan gün çok az (${r.lectDayCount})`);
+      assert.ok(r.mastered > 0, `${sc.name}: hiç konu öğrenilmedi`);
+    });
+  }
 });
