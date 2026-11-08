@@ -461,32 +461,36 @@ function freeWindows(settings: ScheduleSettings, weekday: number) {
   return gaps;
 }
 
-const planningNested = { on: false };
-
-function avoidEarlierThisWeek(
-  topics: TopicRow[],
-  daily: DailyRow[],
-  wrongs: WrongRow[],
-  tytExams: TytExam[],
-  aytExams: AytExam[],
-  settings: ScheduleSettings,
-  carry: CarryItem[],
-  today: string,
-) {
-  if (planningNested.on) return new Set<string>();
-  const start = settings.programStart || today;
-  if (today <= start) return new Set<string>();
+/**
+ * Geçmişte anlatımı VERİLMİŞ konular (`exam|subject|topic`).
+ *
+ * `avoid` kümesinin tek amacı aynı konunun anlatımını ikinci kez açmamaktır;
+ * soru çözümü, tekrar ve eksik kapatma bu kümeyle engellenmez (bkz. `addTask`
+ * içindeki `isNew && avoid.has(...)` koşulu).
+ *
+ * Kaynak iki tanedir ve ikisi de O(n) okunur:
+ *  1) `topics.status !== "Başlamadım"` — konu bir kez anlatılınca "Çalışıyorum"
+ *     olur; bu, ders/sınav bazında KESİN ve güncel kayıttır.
+ *  2) `daily` içindeki "Konu anlatımı" satırları — kullanıcı konu durumunu
+ *     güncellemese bile anlatım yapıldığı burada görünür. `daily` satırında
+ *     `exam` alanı olmadığından ders+konu eşleşmesi iki sınav için de korunur.
+ *
+ * ÖNEMLİ: Geçmiş planı BUGÜNKÜ konu durumuyla yeniden oynatmak (eski
+ * `avoidEarlierThisWeek`) yanlıştı. Bugün başlamış konular geçmişte
+ * "başlamamış" görünmediğinden replay, o günün sıradaki HİÇ işlenmemiş
+ * konularını seçip onları `avoid`a atıyordu; böylece her gün bir sonraki konu
+ * kalıcı olarak bloke ediliyor, 14.11.2026'dan sonra yeni konu üretimi sıfıra
+ * iniyor ve AYT kapıları hiç açılmıyordu. Üstelik maliyeti O(gün²) idi.
+ */
+function taughtTopics(topics: TopicRow[], daily: DailyRow[]): Set<string> {
   const used = new Set<string>();
-  planningNested.on = true;
-  try {
-    for (let date = start; date < today; date = addDaysISO(date, 1)) {
-      const { slots } = buildDailyPlan(topics, daily, wrongs, tytExams, aytExams, settings, carry, date, used);
-      for (const sl of slots) {
-        if (sl.kind === "Konu anlatımı") used.add(`${sl.exam}|${sl.subject}|${sl.topic}`);
-      }
-    }
-  } finally {
-    planningNested.on = false;
+  for (const t of topics) {
+    if (t.status !== "Başlamadım") used.add(`${t.exam}|${t.subject}|${t.topic}`);
+  }
+  for (const d of daily) {
+    if (d.kind !== "Konu anlatımı" || !d.subject || !d.topic) continue;
+    used.add(`TYT|${d.subject}|${d.topic}`);
+    used.add(`AYT|${d.subject}|${d.topic}`);
   }
   return used;
 }
@@ -671,9 +675,7 @@ export function buildDailyPlan(
     }));
     return { slots: [], life: lifeOnly };
   }
-  const avoid =
-    avoidExternal ??
-    avoidEarlierThisWeek(topics, daily, wrongs, tytExams, aytExams, settings, carry, today);
+  const avoid = avoidExternal ?? taughtTopics(topics, daily);
   const phase = phaseFor(pace.timeline, today);
   const ranked = rankTopics(topics, daily, wrongs, today);
   const reviews = dueReviews(topics, daily, today);
@@ -770,19 +772,38 @@ export function buildDailyPlan(
     fixedMinutes += 50;
   }
 
-  const recentWrong = wrongs.filter((w) => daysBetween(w.date, today) <= 5);
-  if (recentWrong.length >= 3) {
+  // Yanlış analizi: son günlerdeki yanlışlar DERS bazında gruplanır ve her ders
+  // için konuya bağlı ayrı bir analiz görevi üretilir. Eskiden tek bir rastgele
+  // dersin analizi yazılıyordu (recentWrong[0]) ve toplam yanlış < 3 ise hiç
+  // üretilmiyordu. Mükerrer üretim yoktur: pencere 5 gündür ve günlük en fazla
+  // 2 ders analiz edilir; eskiyen yanlışlar kendiliğinden düşer. Görev süresi
+  // `fixedMinutes`e eklenir, yani günlük kapasiteye dahildir.
+  const wrongWindow = wrongs.filter((w) => daysBetween(w.date, today) <= 5 && w.subject);
+  const wrongBySubject = new Map<string, WrongRow[]>();
+  for (const w of wrongWindow) {
+    const key = `${w.exam || "TYT"}|${w.subject}`;
+    const list = wrongBySubject.get(key) ?? [];
+    list.push(w);
+    wrongBySubject.set(key, list);
+  }
+  let wrongTasks = 0;
+  for (const [key, list] of [...wrongBySubject.entries()].sort((a, b) => b[1].length - a[1].length)) {
+    if (wrongTasks >= 2) break;
+    if (list.length < 2 && wrongWindow.length < 3) continue;
+    const [exam, subject] = key.split("|");
+    const topicsOf = [...new Set(list.map((w) => w.topic).filter(Boolean))];
     tasks.push({
-      exam: (recentWrong[0].exam || "TYT") as "TYT" | "AYT",
-      subject: recentWrong[0].subject || "Karışık",
+      exam: exam as "TYT" | "AYT",
+      subject,
       topic: "Yanlış analizi",
       kind: "Yanlış analizi",
-      targetQ: Math.min(12, recentWrong.length),
+      targetQ: Math.min(12, list.length * 3),
       minutes: 40,
       priority: "orta",
-      reason: `Son 5 günde ${recentWrong.length} yanlış kaydı`,
+      reason: `Son 5 günde ${list.length} yanlış (${subject}${topicsOf.length ? `: ${topicsOf.slice(0, 3).join(", ")}` : ""})`,
     });
     fixedMinutes += 40;
+    wrongTasks += 1;
   }
 
   // Yerleştirme sırası önemli: görevler listedeki sırayla saat dilimlerine
@@ -791,12 +812,24 @@ export function buildDailyPlan(
   //   2) tekrar (bütçede kalan pay kadar)
   //   3) başlanmış konuların soru çözümü
   // Yeni konu en sona bırakılırsa sabit görevler bütçeyi doldurup program durur.
-  const split = splitBudget(budget, pace.perDay, fixedMinutes, {
+  // Yeni konu rezervi YALNIZCA gerçekten açılacak yeni konu varsa ayrılır.
+  // İlk tur bittikten sonra `pace.perDay` hâlâ dolu görünür (tüm müfredat hesabı);
+  // rezerv sıfırlanmazsa bütçenin ~110 dk'sı var olmayan yeni konulara ayrılır ve
+  // gerçek işler (deneme, yanlış analizi, SRS, branş) açlığa itilir. Ölçüm:
+  // Mart–Haziran'da 480 dk kapasitenin yalnızca ~128 dk'sı kullanılıyordu.
+  const hasNewTopics =
+    phase.newTopics &&
+    !sunday &&
+    topics.some(
+      (t) => t.status === "Başlamadım" && !isOngoingTopic(t.exam, t.subject, t.topic),
+    );
+  const perDayReserve = hasNewTopics ? pace.perDay : 0;
+  const split = splitBudget(budget, perDayReserve, fixedMinutes, {
     sunday,
     // Tekrarların pratiği açlığa itmemesi için pratiğe slot ayrılır. Her konu
     // 1 anlatım + 1 soru çözümü tükettiğinden, TYT bittikten sonra AYT'nin
     // tıkanmaması için pratik payı artırılır.
-    practiceSlots: sunday ? 0 : Math.max(1, Math.min(2, pace.perDay - 1)),
+    practiceSlots: hasNewTopics ? Math.max(1, Math.min(2, perDayReserve - 1)) : 0,
   });
   const used2 = new Set<string>();
   // İlerleme kapısı (sert sıra) için "öğrenilmiş" küme.
@@ -1209,20 +1242,9 @@ export function buildWeekGrid(
   today = todayISO(),
 ) {
   const pace = planPace(topics, settings, today);
-  const used = new Set<string>();
-  if (pace.start < pace.from) {
-    planningNested.on = true;
-    try {
-      for (let date = pace.start; date < pace.from; date = addDaysISO(date, 1)) {
-        const { slots } = buildDailyPlan(topics, daily, wrongs, tytExams, aytExams, settings, carry, date, used);
-        for (const sl of slots) {
-          if (sl.kind === "Konu anlatımı") used.add(`${sl.exam}|${sl.subject}|${sl.topic}`);
-        }
-      }
-    } finally {
-      planningNested.on = false;
-    }
-  }
+  // Hafta ızgarası: konu anlatımı tekrarını engellemek için anlatılmış konular
+  // okunur; geçmişi yeniden oynatmaya gerek yok (bkz. `taughtTopics`).
+  const used = taughtTopics(topics, daily);
   return Array.from({ length: 7 }, (_, i) => {
     const date = addDaysISO(pace.from, i);
     const weekday = new Date(date + "T12:00:00").getDay();

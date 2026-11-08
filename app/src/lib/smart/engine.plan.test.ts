@@ -1066,3 +1066,92 @@ describe("eksik kapatma öğrenmeyi gerçekten sağlıyor mu", () => {
     assert.equal(over, 0, `kapasite aşılan gün sayısı: ${over}`);
   });
 });
+
+/**
+ * GERÇEK UYGULAMA ÇAĞRI BİÇİMİ (Mod B) regresyonu.
+ *
+ * Yukarıdaki testlerin neredeyse tamamı `buildDailyPlan(..., new Set())` diye
+ * çağırıyor; yani `avoid` kümesini boş veriyor. Uygulama ise 9. argümanı
+ * VERMEZ (`program.tsx:31`, `smart-panels.tsx:17`) ve motor kendi geçmiş
+ * kümesini kurar. Bu fark yüzünden aşağıdaki hata yıllarca görünmedi:
+ *
+ * `avoidEarlierThisWeek`, geçmiş günleri BUGÜNKÜ konu durumuyla yeniden
+ * oynatıyordu. Bugün başlamış konular geçmişte "başlamamış" görünmediğinden
+ * replay o günün sıradaki HİÇ işlenmemiş konularını seçiyor ve `avoid`a
+ * atıyordu. Böylece her gün bir sonraki konu kalıcı bloke ediliyor, 14.11.2026
+ * sonrası yeni konu üretimi sıfıra iniyor ve AYT kapıları hiç açılmıyordu
+ * (kullanıcı raporu: "program 14 Kasım'dan sonra donuyor"). Ek olarak maliyet
+ * O(gün²) olduğundan tek çağrı saniyeler sürüyordu.
+ *
+ * Bu blok uygulama çağrı biçimini birebir kullanır.
+ */
+describe("gerçek uygulama çağrı biçimi (Mod B)", () => {
+  /** Motoru uygulamanın çağırdığı gibi (avoidExternal vermeden) işletir. */
+  function runApp(days: number) {
+    let topics = seed();
+    const lectDays: Record<string, string[]> = {};
+    let maxMs = 0;
+    for (let i = 0; i < days; i++) {
+      const date = addDays(S.programStart, i);
+      const t0 = Date.now();
+      // 9. argüman YOK — uygulamanın çağrısı.
+      const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date);
+      maxMs = Math.max(maxMs, Date.now() - t0);
+      for (const sl of slots) {
+        if (sl.kind === "Konu anlatımı") {
+          (lectDays[date] ??= []).push(`${sl.exam}|${sl.subject}|${sl.topic}`);
+        }
+      }
+      for (const sl of slots) {
+        if (!sl.exam || sl.kind === "Deneme" || sl.kind === "Yanlış analizi") continue;
+        if (sl.kind === "Konu anlatımı") {
+          topics = topics.map((t) =>
+            t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic && t.status === "Başlamadım"
+              ? { ...t, status: "Çalışıyorum", lastStudy: date }
+              : t,
+          );
+        } else {
+          topics = topics.map((t) => {
+            if (!(t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic)) return t;
+            if (t.status === "Başlamadım") return t;
+            const q = Math.max(15, sl.targetQ || 15);
+            const total = (t.total ?? 0) + q;
+            const correct = (t.correct ?? 0) + Math.round(q * 0.78);
+            return { ...t, total, correct, lastStudy: date, status: total >= 15 && correct / total >= 0.7 ? "Bitti" : t.status };
+          });
+        }
+      }
+    }
+    return { lectDays, maxMs, topics };
+  }
+
+  it("ilk 30 günde yeni konu anlatımı durmaz (donma yok)", () => {
+    // Hatanın en yalın görünümü: 14.11.2026'dan sonra anlatım sayısı 0'a iniyordu.
+    const { lectDays } = runApp(30);
+    const daysWithLect = Object.keys(lectDays).filter((d) => lectDays[d].length > 0);
+    const firstHalf = daysWithLect.filter((d) => daysBetweenISO(S.programStart, d) < 15).length;
+    const secondHalf = daysWithLect.filter((d) => daysBetweenISO(S.programStart, d) >= 15).length;
+    assert.ok(secondHalf > 0, "ilk 15 günden sonra hiç yeni konu açılmadı (Mod B donması)");
+    assert.ok(
+      secondHalf >= firstHalf * 0.6,
+      `ikinci yarıda anlatım çöktü: ilk ${firstHalf}, sonra ${secondHalf}`,
+    );
+  });
+
+  it("AYT kapıları açılır (AYT hiç başlamama hatası yok)", () => {
+    // Kapılar açılmazsa AYT hiç başlamaz; rapor §12'nin ana bulgusu buydu.
+    const { topics } = runApp(120);
+    const u = RM.aytUnlocks(topics);
+    const anyOpen = u.mat.ready || u.fiz.ready || u.kim.ready || u.bio.ready;
+    assert.ok(anyOpen, "120 günde hiçbir AYT kapısı açılmadı");
+    const aytStarted = topics.some((t: any) => t.exam === "AYT" && t.status !== "Başlamadım");
+    assert.ok(aytStarted, "AYT hiç başlamadı");
+  });
+
+  it("tek çağrı hızlıdır (O(gün²) replay yok)", () => {
+    // Eski replay her çağrıda geçmişi yeniden planlıyordu: 120. günde tek çağrı
+    // ~3,3 sn sürüyordu. Basit doğrusal okuma < 1 sn olmalı.
+    const { maxMs } = runApp(60);
+    assert.ok(maxMs < 1000, `tek çağrı çok yavaş: ${maxMs} ms (replay geri gelmiş olabilir)`);
+  });
+});
