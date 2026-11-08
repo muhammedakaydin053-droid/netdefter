@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { HealthBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,16 @@ export function TodayPlanPanel() {
   const aytExams = useAppStore((s) => s.aytExams);
   const settings = useAppStore((s) => s.settings);
   const carry = useAppStore((s) => s.carry);
-  const { slots } = buildDailyPlan(topics, daily, wrongs, tytExams, aytExams, settings, carry);
+  const analyzedWrongs = useAppStore((s) => s.analyzedWrongs);
+  const markWrongsAnalyzed = useAppStore((s) => s.markWrongsAnalyzed);
+  const branchMockHistory = useAppStore((s) => s.branchMockHistory);
+  const markBranchMock = useAppStore((s) => s.markBranchMock);
+  const { slots, analyzedWrongIds, branchMockSubject } = buildDailyPlan(topics, daily, wrongs, tytExams, aytExams, settings, carry, todayISO(), undefined, analyzedWrongs, branchMockHistory);
+  useEffect(() => {
+    if (analyzedWrongIds.length) markWrongsAnalyzed(analyzedWrongIds, todayISO());
+    if (branchMockSubject) markBranchMock(branchMockSubject, todayISO());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analyzedWrongIds.join(","), branchMockSubject]);
 
   return (
     <section className="rounded-[var(--radius-xl)] border border-border bg-surface p-5 shadow-[var(--shadow-soft)]">

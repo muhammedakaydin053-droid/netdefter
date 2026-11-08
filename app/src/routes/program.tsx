@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,11 +24,22 @@ function ProgramPage() {
   const aytExams = useAppStore((s) => s.aytExams);
   const settings = useAppStore((s) => s.settings);
   const carry = useAppStore((s) => s.carry);
+  const analyzedWrongs = useAppStore((s) => s.analyzedWrongs);
+  const markWrongsAnalyzed = useAppStore((s) => s.markWrongsAnalyzed);
+  const branchMockHistory = useAppStore((s) => s.branchMockHistory);
+  const markBranchMock = useAppStore((s) => s.markBranchMock);
   const updateSettings = useAppStore((s) => s.updateSettings);
   const missYesterday = useAppStore((s) => s.missYesterday);
   const clearCarry = useAppStore((s) => s.clearCarry);
   const replanProgram = useAppStore((s) => s.replanProgram);
-  const { slots, life } = buildDailyPlan(topics, daily, wrongs, tytExams, aytExams, settings, carry);
+  const { slots, life, analyzedWrongIds, branchMockSubject } = buildDailyPlan(topics, daily, wrongs, tytExams, aytExams, settings, carry, todayISO(), undefined, analyzedWrongs, branchMockHistory);
+  // Yanlış analizi görevleri üretildikten sonra kayıtları "analiz edildi" olarak
+  // işaretle; böylece ertesi gün aynı yanlış için mükerrer görev oluşmaz.
+  useEffect(() => {
+    if (analyzedWrongIds.length) markWrongsAnalyzed(analyzedWrongIds, todayISO());
+    if (branchMockSubject) markBranchMock(branchMockSubject, todayISO());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analyzedWrongIds.join(","), branchMockSubject]);
   const week = weeklyBlueprint(topics, daily, wrongs, settings);
   const timeline = [...slots, ...life].sort((a, b) => a.start.localeCompare(b.start));
   const unlock = aytUnlocks(topics);

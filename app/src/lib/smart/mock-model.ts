@@ -88,10 +88,18 @@ export function chooseMock(opts: {
   branchSubject: string | null;
   /** Sınav geneli kapsam (0–1). */
   overallCoverage: number;
+  /**
+   * Deneme takvimi ilerleme sayacı (program başından beri geçen hafta). Hiç
+   * deneme kaydı yoksa TYT/AYT tam denemeleri bu sayaçla DÖNÜŞÜMLÜ seçilir;
+   * aksi hâlde iki taraf da "hiç yapılmadı" (Infinity) olduğundan denge hep
+   * TYT'ye kayıp AYT açlıkta kalıyordu.
+   */
+  tick?: number;
 }): MockChoice | null {
   if (!opts.isMockDay) return null;
   const tytDue = opts.tytReady && opts.tytOverdueDays >= opts.tytInterval;
   const aytDue = opts.aytReady && opts.aytOverdueDays >= opts.aytInterval;
+  const tick = opts.tick ?? 0;
 
   const tytFull: MockChoice = {
     type: "tam",
@@ -109,9 +117,14 @@ export function chooseMock(opts: {
   };
 
   if (tytDue && aytDue) {
-    // En çok gecikmiş tam deneme; eşitlikte TYT.
     const tytExcess = opts.tytOverdueDays - opts.tytInterval;
     const aytExcess = opts.aytOverdueDays - opts.aytInterval;
+    // Hiç kayıt yoksa (iki taraf da Infinity) veya gecikmeler eşitse dönüşümlü
+    // seç: TYT ve AYT denemeleri almaşık gider, hiçbiri açlıkta kalmaz.
+    if (!Number.isFinite(tytExcess) && !Number.isFinite(aytExcess)) {
+      return tick % 2 === 0 ? tytFull : aytFull;
+    }
+    if (tytExcess === aytExcess) return tick % 2 === 0 ? tytFull : aytFull;
     return aytExcess > tytExcess ? aytFull : tytFull;
   }
   if (aytDue) return aytFull;

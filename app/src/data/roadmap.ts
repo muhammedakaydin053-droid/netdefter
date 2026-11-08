@@ -252,12 +252,51 @@ export function tytMockReady(topics: TopicRow[], tytExams: TytExam[]) {
   return mat.done / mat.total >= 0.4;
 }
 
-/** AYT deneme: son TYT net ≥ 70 ve ilgili AYT kapısı açık. 70 altı AYT denemeyi şişirmez. */
+/** Bir dersteki öğrenilmiş konu oranı (0–1). Dairesel import olmaması için yerel. */
+function subjectCoverageOf(topics: TopicRow[], exam: string, subject: string): number {
+  const rows = topics.filter((t) => t.exam === exam && t.subject === subject);
+  if (!rows.length) return 0;
+  const byTopic = new Map<string, TopicRow[]>();
+  for (const r of rows) {
+    const list = byTopic.get(r.topic) ?? [];
+    list.push(r);
+    byTopic.set(r.topic, list);
+  }
+  let mastered = 0;
+  for (const list of byTopic.values()) {
+    if (list.every((r) => learningStage(r) === "ogrenildi")) mastered += 1;
+  }
+  return mastered / byTopic.size;
+}
+
+/**
+ * AYT deneme hazırlığı: AYT konu kapsamı ve kapılar.
+ *
+ * Eski koşul "son TYT net ≥ 70" idi. Veri bulunmaması (hiç sonuç girilmemesi)
+ * başarısızlık gibi yorumlanıyor ve AYT denemeleri hiç açılmıyordu. Artık kapı
+ * AYT'nin kendi ilerlemesidir:
+ *
+ *  - AYT derslerinin ortalama konu kapsamı yeterli (≥ %25) VEYA en az iki AYT
+ *    kapısı (Mat/Fiz/Kim/Bio) açık.
+ *  - TYT neti girilmişse ve düşükse (< 70) tam AYT denemesi ERTELENİR ama
+ *    TAMAMEN kapatılmaz; kapsam yeterliyse yine de açılır (veri yokluğu ile
+ *    düşük başarı ayrı durumlardır; düşük net yalnızca geciktirir).
+ *  - AYT kapsamı yetersizse erken dönemde zorla deneme yerleştirilmez.
+ */
 export function aytMockReady(topics: TopicRow[], tytExams: TytExam[], aytExams: AytExam[]) {
-  const nets = lastExamNet(tytExams, aytExams);
-  if (nets.tyt == null || nets.tyt < 70) return false;
   const u = aytUnlocks(topics);
-  return u.mat.ready || u.fiz.ready || u.kim.ready || u.bio.ready;
+  const openGates = [u.mat.ready, u.fiz.ready, u.kim.ready, u.bio.ready].filter(Boolean).length;
+  const aytSubjects = [...new Set(topics.filter((t) => t.exam === "AYT").map((t) => t.subject))];
+  const cov = aytSubjects.length
+    ? aytSubjects.reduce((acc, s) => acc + subjectCoverageOf(topics, "AYT", s), 0) / aytSubjects.length
+    : 0;
+  const coverageReady = cov >= 0.25 || openGates >= 2;
+  if (!coverageReady) return false;
+  // Düşük TYT neti (veri VARSA ve < 70) tam AYT denemesini geciktirir; veri
+  // yokluğu engel değildir.
+  const nets = lastExamNet(tytExams, aytExams);
+  if (nets.tyt != null && nets.tyt < 70 && cov < 0.5) return false;
+  return true;
 }
 
 export function isGaranti(exam: string, subject: string, topic: string) {

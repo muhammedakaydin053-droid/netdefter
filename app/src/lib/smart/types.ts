@@ -40,6 +40,8 @@ export interface PlanSlot {
   minutes: number;
   priority: "yüksek" | "orta" | "düşük";
   reason: string;
+  /** Yanlış analizi görevinin bağlı olduğu yanlış kayıtlarının kimlikleri. */
+  wrongIds?: string[];
   life?: boolean;
 }
 

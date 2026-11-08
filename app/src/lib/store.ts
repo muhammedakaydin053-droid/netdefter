@@ -103,6 +103,10 @@ export interface AppState {
   daily: DailyRow[];
   settings: ScheduleSettings;
   carry: CarryItem[];
+  /** Yanlış kaydı kimliği → analiz edildiği tarih. Mükerrer analizi önler. */
+  analyzedWrongs: Record<string, string>;
+  /** `exam|subject` → son branş denemesi tarihi. Branş rotasyonunu yönetir. */
+  branchMockHistory: Record<string, string>;
   backup: DataSnapshot | null;
   lastAiComment: { at: string; text: string } | null;
   updateTopic: (id: string, patch: Partial<TopicRow>) => void;
@@ -121,6 +125,10 @@ export interface AppState {
   updateSettings: (patch: Partial<ScheduleSettings>) => void;
   missYesterday: () => void;
   clearCarry: () => void;
+  /** Yanlış analizi yapılan kayıtları (id → tarih) işaretler. */
+  markWrongsAnalyzed: (ids: string[], date: string) => void;
+  /** Bir derse branş denemesi verildiğini (ders → tarih) işaretler. */
+  markBranchMock: (subject: string, date: string) => void;
   replanProgram: (from?: string) => void;
   resetAll: () => void;
   restoreBackup: () => void;
@@ -203,6 +211,8 @@ export const useAppStore = create<AppState>()(
       daily: [],
       settings: DEFAULT_SETTINGS,
       carry: [],
+      analyzedWrongs: {},
+      branchMockHistory: {},
       backup: null,
       lastAiComment: null,
       updateTopic: (id, patch) =>
@@ -331,6 +341,14 @@ export const useAppStore = create<AppState>()(
         });
       },
       clearCarry: () => set({ carry: [] }),
+      markWrongsAnalyzed: (ids, date) =>
+        set((s) => {
+          const next = { ...s.analyzedWrongs };
+          for (const id of ids) next[id] = date;
+          return { analyzedWrongs: next };
+        }),
+      markBranchMock: (subject, date) =>
+        set((s) => ({ branchMockHistory: { ...s.branchMockHistory, [`TYT|${subject}`]: date } })),
       /** Programı bugünden yeniden planlar: konu/deneme verisi korunur, takvim yeniden çapalanır. */
       replanProgram: (from) =>
         set({ settings: { ...get().settings, programStart: from ?? todayISO() } }),
@@ -419,6 +437,8 @@ export const useAppStore = create<AppState>()(
         daily: s.daily,
         settings: s.settings,
         carry: s.carry,
+        analyzedWrongs: s.analyzedWrongs,
+        branchMockHistory: s.branchMockHistory,
         backup: s.backup,
         lastAiComment: s.lastAiComment,
       }),
@@ -427,7 +447,7 @@ export const useAppStore = create<AppState>()(
           (persisted as Partial<
             Pick<
               AppState,
-              "topics" | "archivedTopics" | "wrongs" | "tytExams" | "aytExams" | "daily" | "settings" | "carry" | "backup" | "lastAiComment"
+              "topics" | "archivedTopics" | "wrongs" | "tytExams" | "aytExams" | "daily" | "settings" | "carry" | "analyzedWrongs" | "branchMockHistory" | "backup" | "lastAiComment"
             >
           >) ?? {};
         // Eski yedeklerde `archivedTopics` yoktur; boş arşivle güvenle devam edilir.
@@ -439,6 +459,8 @@ export const useAppStore = create<AppState>()(
           archivedTopics: merged.archivedTopics,
           settings: { ...DEFAULT_SETTINGS, ...p.settings },
           carry: p.carry ?? [],
+          analyzedWrongs: p.analyzedWrongs ?? {},
+          branchMockHistory: p.branchMockHistory ?? {},
           backup: p.backup ?? null,
         };
       },

@@ -23,7 +23,7 @@
  *    ALTINDA kalan öğrenci denemeden mahrum bırakılmaz.
  */
 
-import type { AytExam, TopicRow, TytExam } from "@/lib/types";
+import type { AytExam, TopicRow, TytExam, WrongRow } from "@/lib/types";
 import { aytNets, tytNets } from "@/lib/stats";
 import { aytUnlocks } from "@/data/roadmap";
 import { learningStage } from "@/lib/smart/progress";
@@ -189,6 +189,99 @@ export function generalMockDecision(
     reason += `. Son ${roll.count} deneme ortalaması ${roll.avg.toFixed(1)} (${roll.trend >= 0 ? "↑" : "↓"} ${Math.abs(roll.trend).toFixed(1)}).`;
   }
   return { exam, subject: "Genel", kind: "genel", coverage, weighted: false, reduced, reason };
+}
+
+/** İki ISO tarih arasındaki gün farkı (b − a). */
+function dayDiff(a: string, b: string): number {
+  return Math.round((Date.parse(b + "T12:00:00Z") - Date.parse(a + "T12:00:00Z")) / 86400000);
+}
+
+/** Dersin son denemedeki net oranı (0–1) veya veri yoksa null. */
+function subjectNetRatio(tytExams: TytExam[], subject: string): number | null {
+  const last = [...tytExams].filter((e) => e.date).sort((a, b) => a.date.localeCompare(b.date)).at(-1);
+  if (!last) return null;
+  const n = tytNets(last);
+  const bucket = subject === "Türkçe" ? n.tur : subject === "Matematik" || subject === "Geometri" ? n.mat : ["Fizik", "Kimya", "Biyoloji"].includes(subject) ? n.fen : n.sos;
+  if (bucket == null) return null;
+  const max = subject === "Türkçe" || subject === "Matematik" || subject === "Geometri" ? 40 : 20;
+  return Math.max(0, Math.min(1, bucket / max));
+}
+
+/**
+ * Branş denemesi için ders seçimi.
+ *
+ * Eski motor yalnızca "kapsamı yeterli derslerin EN DÜŞÜK kapsamlısı"nı seçiyordu;
+ * bu yüzden dört branş denemesinin tamamı Türkçe'ye gidiyordu. Burada karar
+ * birlikte verilir:
+ *
+ *  - Yalnızca konu kapsamı yeterli (%50+) dersler adaydır.
+ *  - Zayıflık: son 14 gündeki yanlış yoğunluğu ve düşük net puanı yükseltir.
+ *  - Rotasyon: hiç denenmemiş / uzun süredir denenmemiş ders yükseltilir.
+ *    Deneme kayıtları ders türünü (branş/tam) ayırmadığı için geçmiş her zaman
+ *    dolu olmayabilir; bu yüzden rotasyon ayrıca GÜNE BAĞLI deterministiktir:
+ *    adaylar arasında `gün indeksi mod aday sayısı` sıradaki dersi işaret eder.
+ *    Böylece art arda deneme günlerinde (3–7 gün arayla) farklı ders seçilir ve
+ *    tek bir ders yığılmaz. Geçmiş (`subjectLastMock`) verilirse yakın tarihli
+ *    ders soğuma süresince elenir.
+ *
+ * Skor = 2.0·(sıradaki ders) + 1.5·yanlışYoğunluğu + 1.0·(1−net) +
+ *        0.8·(1−kapsam) + 0.5·bayatlık. En yüksek skorlu ders seçilir.
+ */
+export function pickBranchSubject(opts: {
+  topics: TopicRow[];
+  tytExams: TytExam[];
+  wrongs: WrongRow[];
+  /** `exam|subject` → son branş denemesi tarihi (varsa). */
+  subjectLastMock?: Record<string, string>;
+  today: string;
+  /** Aday dersler. */
+  candidates: string[];
+  cooldownDays?: number;
+}): { subject: string; coverage: number; reason: string } | null {
+  const cooldown = opts.cooldownDays ?? 10;
+  const history = opts.subjectLastMock ?? {};
+  const all = [...opts.candidates].sort((a, b) => a.localeCompare(b, "tr"));
+  const eligible = all.filter((s) => subjectCoverage(opts.topics, "TYT", s) >= 0.5);
+  if (!eligible.length) return null;
+  const recent = eligible.filter((s) => {
+    const last = history[`TYT|${s}`];
+    return last ? dayDiff(last, opts.today) < cooldown : false;
+  });
+  const pool = eligible.filter((s) => !recent.includes(s));
+  const finalPool = pool.length ? pool : eligible;
+  // Rotasyon: sıra SABİT aday listesi (`all`) üzerinden ve ŞİMDİYE KADAR DENENMİŞ
+  // DERS SAYISINA göre hesaplanır. Deneme günleri 14 gün arayla geldiği için
+  // güne bağlı (`dayIndex % 6`) rotasyon yalnızca çift sıraları görüyor ve tek
+  // derse yığılıyordu; geçmiş sayacı her branş denemesinde bir artarak altı
+  // dersi de sırayla dolaşır. Geçmişte denenmiş ders soğuma süresince elenir.
+  const mockedCount = Object.keys(history).length;
+  const turn = ((mockedCount % all.length) + all.length) % all.length;
+  const ordered = [...all.slice(turn), ...all.slice(0, turn)];
+  const dueSubject = ordered.find((s) => finalPool.includes(s)) ?? finalPool[0];
+  const wrong14 = (subject: string) =>
+    opts.wrongs.filter((w) => w.subject === subject && w.date && dayDiff(w.date, opts.today) <= 14).length;
+  const scored = finalPool.map((subject) => {
+    const coverage = subjectCoverage(opts.topics, "TYT", subject);
+    const last = history[`TYT|${subject}`];
+    const daysSince = last ? dayDiff(last, opts.today) : 999;
+    const wrongs = wrong14(subject);
+    const net = subjectNetRatio(opts.tytExams, subject);
+    const wrongScore = Math.min(1, wrongs / 4);
+    const netScore = net == null ? 0 : 1 - net;
+    const stale = Math.min(1, daysSince / 30);
+    const rotation = subject === dueSubject ? 1 : 0;
+    const score = 2.0 * rotation + 1.5 * wrongScore + 1.0 * netScore + 0.8 * (1 - coverage) + 0.5 * stale;
+    return { subject, coverage, score, wrongs, net, rotation };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  const best = scored[0];
+  const parts = [
+    `kapsam %${Math.round(best.coverage * 100)}`,
+    best.wrongs ? `${best.wrongs} yanlış` : null,
+    best.net != null ? `net %${Math.round(best.net * 100)}` : "net verisi yok",
+    best.rotation ? "rotasyon sırası" : history[`TYT|${best.subject}`] ? `son deneme ${history[`TYT|${best.subject}`]}` : "hiç denenmedi",
+  ].filter(Boolean);
+  return { subject: best.subject, coverage: best.coverage, reason: parts.join(", ") };
 }
 
 /** Öğrenciye gösterilecek deneme takvimi özeti. */

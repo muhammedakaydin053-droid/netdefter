@@ -5,7 +5,7 @@ import { countsIssue, n, pctOf, sanitizeCounts } from "@/lib/calc";
 import { MIN_QUESTIONS_FOR_MASTERED, MASTERY_RATIO } from "@/lib/smart/progress";
 import { splitBudget, capacity, dailyCapacity, type DayLoad } from "@/lib/smart/budget";
 import { topicAggregates, aytNets, tytNets, dailyTotals } from "@/lib/stats";
-import { overallCoverage, subjectCoverage } from "@/lib/smart/mock-plan";
+import { overallCoverage, pickBranchSubject } from "@/lib/smart/mock-plan";
 import { chooseMock } from "@/lib/smart/mock-model";
 import type { AytExam, DailyRow, TopicRow, TytExam, WrongRow } from "@/lib/types";
 import { addDaysISO, todayISO, uid } from "@/lib/utils";
@@ -656,7 +656,16 @@ export function buildDailyPlan(
   carry: CarryItem[],
   today = todayISO(),
   avoidExternal?: Set<string>,
-): { slots: PlanSlot[]; life: PlanSlot[] } {
+  analyzedWrongs?: Record<string, string>,
+  branchHistory?: Record<string, string>,
+): {
+  slots: PlanSlot[];
+  life: PlanSlot[];
+  /** Bugün analiz edilen yanlış kayıtlarının kimlikleri (çağıran taraf işaretler). */
+  analyzedWrongIds: string[];
+  /** Bugün verilen branş denemesi dersi (çağıran taraf geçmişe işler). */
+  branchMockSubject: string | null;
+} {
   const weekday = new Date(today + "T12:00:00").getDay();
   const sunday = weekday === 0;
   const pace = planPace(topics, settings, today);
@@ -675,7 +684,7 @@ export function buildDailyPlan(
       reason: "Korunan yaşam bloğu",
       life: true,
     }));
-    return { slots: [], life: lifeOnly };
+    return { slots: [], life: lifeOnly, analyzedWrongIds: [], branchMockSubject: null };
   }
   const avoid = avoidExternal ?? taughtTopics(topics, daily);
   const phase = phaseFor(pace.timeline, today);
@@ -711,6 +720,8 @@ export function buildDailyPlan(
   // Deneme günü: 165–180 dk'lık tam deneme günün omurgasıdır. Bu bayrak denemenin
   // bitişik yerleşmesini ve o gün yeni konu açılmamasını tetikler.
   let mockFull = false;
+  let mockShort = false;
+  let branchMockSubject: string | null = null;
   if (mockDay) {
     const tytReady = tytMockReady(topics, tytExams);
     const aytReady = aytMockReady(topics, tytExams, aytExams);
@@ -721,16 +732,24 @@ export function buildDailyPlan(
     // Gecikme günleri: hiç deneme yoksa Infinity (zamanı gelmiş sayılır).
     const tytOverdueDays = lastTyt ? daysBetween(lastTyt.date, today) : Infinity;
     const aytOverdueDays = lastAyt ? daysBetween(lastAyt.date, today) : Infinity;
-    // Branş denemesi için en zayıf, kapsamı yeterli (%50+) ders. Kapsam çok
-    // düşükken branş denemesi konu eksikliğini ölçer, yanıltıcıdır.
-    const branchSubject =
-      ["Türkçe", "Matematik", "Geometri", "Fizik", "Kimya", "Biyoloji"]
-        .map((sub) => ({ sub, cov: subjectCoverage(topics, "TYT", sub) }))
-        .filter((x) => x.cov >= 0.5)
-        .sort((a, b) => a.cov - b.cov)[0]?.sub ?? null;
+    // Branş denemesi dersi: kapsam + zayıflık (yanlış/net) + rotasyon birlikte.
+    // Eski kod yalnızca "en düşük kapsamlı uygun ders"i seçiyordu; dört branş
+    // denemesinin tamamı Türkçe'ye gidiyordu. Deneme kayıtları ders türünü
+    // ayırmadığı için `subjectLastMock` boş geçilir; rotasyon güne bağlıdır.
+    const branch = pickBranchSubject({
+      topics,
+      tytExams,
+      wrongs,
+      today,
+      candidates: ["Türkçe", "Matematik", "Geometri", "Fizik", "Kimya", "Biyoloji"],
+      subjectLastMock: branchHistory,
+    });
     // Deneme türü seçimi saf modelde (`mock-model.ts`): tam TYT / tam AYT /
     // branş / mini. Süreler gerçek sınav sürelerinden gelir; hepsine 165 dk
     // vermek yanlıştı. TYT/AYT dengesi gecikmeye göre kurulur.
+    // Deneme takvimi ilerleme sayacı: program başından beri geçen hafta.
+    // Hiç deneme kaydı yoksa TYT/AYT tam denemelerini dönüşümlü seçmek için.
+    const tick = Math.max(0, Math.floor(daysBetween(settings.programStart, today) / 7));
     const mock = chooseMock({
       isMockDay: mockDay,
       tytReady,
@@ -739,8 +758,9 @@ export function buildDailyPlan(
       aytReady,
       aytOverdueDays,
       aytInterval,
-      branchSubject,
+      branchSubject: branch?.subject ?? null,
       overallCoverage: overallCoverage(topics, "TYT"),
+      tick,
     });
     if (mock) {
       tasks.push({
@@ -754,12 +774,12 @@ export function buildDailyPlan(
         reason:
           mock.type === "tam"
             ? mock.exam === "AYT"
-              ? `Son TYT net ≥ 70 ve AYT kapısı açık. ${phase.title} fazı, 14 günde bir.`
+              ? `AYT kapsamı ve kapıları yeterli. ${phase.title} fazı, 14 günde bir.`
               : phase.mockIntensity >= 2
                 ? `${phase.title} fazı: deneme sıklığı arttı, haftada iki.`
                 : "Çekirdek matematiğin ~%40’ı bitti veya deneme kaydı var."
             : mock.type === "brans"
-              ? `Tam deneme zamanı gelmedi; en zayıf ders ölçülür (${mock.subject}).`
+              ? `Tam deneme zamanı gelmedi; branş denemesi: ${branch?.subject ?? mock.subject} (${branch?.reason ?? ""}).`
               : "Kapsam henüz branş denemesine yetmiyor; deneme ritmi mini denemeyle korunur.",
       });
       // Tam deneme günün omurgasıdır: bitişik yerleşir ve o gün yeni konu
@@ -768,6 +788,8 @@ export function buildDailyPlan(
         budget = Math.max(budget, 210);
         mockFull = true;
       }
+      if (mock.type === "brans" || mock.type === "mini") mockShort = true;
+      if (mock.type === "brans") branchMockSubject = mock.subject;
     }
   }
 
@@ -800,38 +822,88 @@ export function buildDailyPlan(
     fixedMinutes += 50;
   }
 
-  // Yanlış analizi: son günlerdeki yanlışlar DERS bazında gruplanır ve her ders
-  // için konuya bağlı ayrı bir analiz görevi üretilir. Eskiden tek bir rastgele
-  // dersin analizi yazılıyordu (recentWrong[0]) ve toplam yanlış < 3 ise hiç
-  // üretilmiyordu. Mükerrer üretim yoktur: pencere 5 gündür ve günlük en fazla
-  // 2 ders analiz edilir; eskiyen yanlışlar kendiliğinden düşer. Görev süresi
-  // `fixedMinutes`e eklenir, yani günlük kapasiteye dahildir.
-  const wrongWindow = wrongs.filter((w) => daysBetween(w.date, today) <= 5 && w.subject);
-  const wrongBySubject = new Map<string, WrongRow[]>();
-  for (const w of wrongWindow) {
-    const key = `${w.exam || "TYT"}|${w.subject}`;
-    const list = wrongBySubject.get(key) ?? [];
+  // Yanlış analizi: son günlerdeki yanlışlar GERÇEK KONU kimliğine göre gruplanır
+  // (exam|subject|topic). Görev `topic` alanı gerçek konuyu taşır ve `wrongIds`
+  // ile kaynak yanlış kayıtlarına bağlanır; `reason` tek başına konu bağlantısı
+  // yerine geçmez. Her yanlış kaydı en fazla BİR kez analiz edilir:
+  // `analyzedWrongs[id]` o yanlışın analiz edildiği günü tutar. Kayıt DAHA ÖNCEKİ
+  // bir günde analiz edildiyse tekrar üretilmez; BUGÜN analiz edildiyse aynı gün
+  // görünmeye devam eder (ekran yenilenince görev kaybolmaz). Kapasite nedeniyle
+  // ertelenen yanlış işaretlenmez ve kaybolmaz. Pencere 7 gündür; `result` dolu
+  // (kullanıcı kapatmış) yanlışlar analiz edilmez. Günde en fazla 2 KONU grubu.
+  const analyzed = analyzedWrongs ?? {};
+  const pendingWrongs = wrongs.filter(
+    (w) =>
+      w.subject &&
+      w.topic &&
+      !w.result &&
+      daysBetween(w.date, today) <= 7 &&
+      !(analyzed[w.id] && analyzed[w.id] < today),
+  );
+  const wrongByTopic = new Map<string, WrongRow[]>();
+  for (const w of pendingWrongs) {
+    const key = `${w.exam || "TYT"}|${w.subject}|${w.topic}`;
+    const list = wrongByTopic.get(key) ?? [];
     list.push(w);
-    wrongBySubject.set(key, list);
+    wrongByTopic.set(key, list);
   }
+  const analyzedWrongIds: string[] = [];
+  const analyzedTopics: { exam: string; subject: string; topic: string }[] = [];
   let wrongTasks = 0;
-  for (const [key, list] of [...wrongBySubject.entries()].sort((a, b) => b[1].length - a[1].length)) {
+  for (const [key, list] of [...wrongByTopic.entries()].sort((a, b) => b[1].length - a[1].length)) {
     if (wrongTasks >= 2) break;
-    if (list.length < 2 && wrongWindow.length < 3) continue;
-    const [exam, subject] = key.split("|");
-    const topicsOf = [...new Set(list.map((w) => w.topic).filter(Boolean))];
+    const [exam, subject, topic] = key.split("|");
+    const subtopics = [...new Set(list.map((w) => w.subtopic).filter(Boolean))];
+    const reasons = [...new Set(list.map((w) => w.reason).filter(Boolean))];
+    const detail = [
+      subtopics.length ? `alt konu: ${subtopics.slice(0, 3).join(", ")}` : "",
+      reasons.length ? `hata: ${reasons.slice(0, 2).join(", ")}` : "",
+    ]
+      .filter(Boolean)
+      .join("; ");
     tasks.push({
       exam: exam as "TYT" | "AYT",
       subject,
-      topic: "Yanlış analizi",
+      topic,
       kind: "Yanlış analizi",
       targetQ: Math.min(12, list.length * 3),
       minutes: 40,
       priority: "orta",
-      reason: `Son 5 günde ${list.length} yanlış (${subject}${topicsOf.length ? `: ${topicsOf.slice(0, 3).join(", ")}` : ""})`,
+      reason: `Son 7 günde ${list.length} yanlış — ${subject}/${topic}${detail ? ` (${detail})` : ""}`,
+      wrongIds: list.map((w) => w.id),
     });
+    analyzedWrongIds.push(...list.map((w) => w.id));
+    analyzedTopics.push({ exam, subject, topic });
     fixedMinutes += 40;
     wrongTasks += 1;
+  }
+
+  // Yanlış analizinin HEMEN ardından hedefli konu çalışması: analiz edilen her
+  // konu için konuya bağlı bir soru çözümü eklenir. Analiz gerçek konuya dönük
+  // çalışmaya dönüşsün diye görev analizle aynı gün ve yeni konulardan ÖNCE
+  // sıraya girer; günlük en fazla 2 analiz olduğu için maliyeti sınırlıdır.
+  // Aynı konu için zaten bir görev varsa (rutin Paragraf/Problemler vb.) eklenmez.
+  for (const t of analyzedTopics) {
+    // Dedup: yalnızca "Yanlış analizi" DIŞINDA aynı konuya ait görev varsa ekleme.
+    // (Yanlış analizi görevi de aynı konuyu taşır; onu eşleştirmek hedefli görevi
+    // tamamen engelliyordu.)
+    if (
+      tasks.some(
+        (x) => x.kind !== "Yanlış analizi" && x.subject === t.subject && x.topic === t.topic,
+      )
+    )
+      continue;
+    tasks.push({
+      exam: t.exam as "TYT" | "AYT",
+      subject: t.subject,
+      topic: t.topic,
+      kind: "Soru çözümü",
+      targetQ: 12,
+      minutes: 40,
+      priority: "orta",
+      reason: `Yanlış analizi sonrası hedefli soru çözümü: ${t.subject}/${t.topic}`,
+      tier: 1,
+    });
   }
 
   // Yerleştirme sırası önemli: görevler listedeki sırayla saat dilimlerine
@@ -855,7 +927,12 @@ export function buildDailyPlan(
   // O gün yeni konu açılmaz; kalan bütçe pratik/tekrara bırakılır. Aksi hâlde
   // anlatılan konuların pratiği ertesi günlere sarkıyordu (ölçüm: 2026-12-23
   // anlatımı 2026-12-27'de çözüldü, 4 gün).
-  const newCap = hasNewTopics ? (mockFull ? 0 : pace.perDay) : 0;
+  // Branş/mini deneme gününde yeni konu açılışı sınırlanır: kısa deneme günü
+  // tümüyle kapatılmaz ama aynı güne 3 yeni anlatım yığılmaz (eski ölçüm:
+  // 2026-12-05 ve 12-12'de branş denemesiyle birlikte 3 yeni konu). En fazla 1
+  // yeni konu; kalan bütçe bekleyen pratik ve tekrara gider. Tam deneme gününde
+  // yeni konu hiç açılmaz (mevcut kural korunur).
+  const newCap = hasNewTopics ? (mockFull ? 0 : mockShort ? Math.min(pace.perDay, 1) : pace.perDay) : 0;
   const perDayReserve = newCap;
   const split = splitBudget(budget, perDayReserve, fixedMinutes, {
     sunday,
@@ -1190,7 +1267,6 @@ export function buildDailyPlan(
   }
 
   // 3. geçiş: başlanmış ama HENÜZ öğrenilmemiş konuların eksik kapatma işleri.
-  //
   // Öğrenilmemiş konu "Bitti" sayılmaz (15 soru + %70 korunur). Bu konular
   // normalde 2. geçişte (SRS) rotasyonlu türle zaten işlenir; buradaki geçiş
   // tekrar tavanı veya bütçe nedeniyle dışarıda kalanlar için yedektir (aynı
@@ -1215,70 +1291,80 @@ export function buildDailyPlan(
   const allWindows = freeWindows(settings, weekday);
   let used = 0;
   const occupied: { start: number; end: number }[] = [];
-  const rest = tasks.filter((t) => t.kind !== "Deneme");
+
+  // TAM SIĞDIRMA. Bir görevin tanımlı süresi (`task.minutes`) ile takvimde
+  // kapladığı aralık BİRBİRİNDEN BAĞIMSIZDIR: görev ya tanımlı süresiyle bütün
+  // yerleşir ya da hiç yerleşmez. Eski kod `Math.min(task.minutes, w.end-cursor)`
+  // ile süreyi pencereye KIRPIYORDU; bu hem 40 dk'lık görevi 55 dk gösterebiliyor
+  // hem de "tanımlı süre ≠ yerleşen süre" tutarsızlığını doğuruyordu.
+  //
+  // Bir görev, süresi kadar boş yer bulunan EN ERKEN pencereye konur. Hiçbir
+  // pencere yetmiyorsa görev o gün düşer (kaybolmaz: bekleyen havuzda kalır ve
+  // ertesi gün yeniden değerlendirilir).
+  const freeRanges = (): { start: number; end: number }[] => {
+    const out: { start: number; end: number }[] = [];
+    for (const w of allWindows) {
+      let segs = [{ start: w.start, end: w.end }];
+      for (const o of occupied) {
+        segs = segs.flatMap((sg) =>
+          o.end <= sg.start || o.start >= sg.end
+            ? [sg]
+            : [
+                ...(o.start > sg.start ? [{ start: sg.start, end: o.start }] : []),
+                ...(o.end < sg.end ? [{ start: o.end, end: sg.end }] : []),
+              ],
+        );
+      }
+      out.push(...segs);
+    }
+    return out.sort((a, b) => a.start - b.start);
+  };
+  const placeAt = (task: (typeof tasks)[number], need: number, start: number) => {
+    const { tier: _tier, ...slot } = task;
+    slots.push({ ...slot, id: uid(), start: fromMin(start), end: fromMin(start + need), minutes: need });
+    used += need;
+    occupied.push({ start, end: start + need });
+  };
+
+  // Deneme, gerçek sınav gibi BİTİŞİK blok kaplar. Kendisini tutan en büyük
+  // pencereye bütün yerleşir; hiçbir pencere yetmezse kırpılmaz, düşer.
   for (const task of tasks.filter((t) => t.kind === "Deneme")) {
-    const need = Math.min(task.minutes, budget - used);
+    const need = task.minutes;
     let idx = -1;
     for (let i = 0; i < allWindows.length; i++) {
       if (allWindows[i].end - allWindows[i].start < need) continue;
       if (idx < 0 || allWindows[i].end - allWindows[i].start > allWindows[idx].end - allWindows[idx].start) idx = i;
     }
     if (idx < 0) continue;
-    const start = allWindows[idx].start;
-    const { tier: _tier, ...slot } = task;
-    slots.push({ ...slot, id: uid(), start: fromMin(start), end: fromMin(start + need), minutes: need });
-    used += need;
-    occupied.push({ start, end: start + need });
+    placeAt(task, need, allWindows[idx].start);
   }
-  const windows: { start: number; end: number }[] = [];
-  for (const w of allWindows) {
-    let segments = [{ start: w.start, end: w.end }];
-    for (const o of occupied) {
-      segments = segments.flatMap((sg) =>
-        o.end <= sg.start || o.start >= sg.end
-          ? [sg]
-          : [
-              ...(o.start > sg.start ? [{ start: sg.start, end: o.start }] : []),
-              ...(o.end < sg.end ? [{ start: o.end, end: sg.end }] : []),
-            ],
-      );
+
+  // Diğer görevler öncelik sırasına göre yerleşir; her biri kendi TAM süresiyle
+  // sığan en erken boş aralığa konur. Sonra ders bloğu olarak yeniden sıralanır.
+  const rest = tasks.filter((t) => t.kind !== "Deneme");
+  for (const task of rest) {
+    const need = task.minutes;
+    if (used + need > budget) break;
+    const ranges = freeRanges();
+    let placed = false;
+    for (const r of ranges) {
+      if (r.end - r.start < need) continue;
+      placeAt(task, need, r.start);
+      placed = true;
+      break;
     }
-    windows.push(...segments);
-  }
-  windows.sort((a, b) => a.start - b.start);
-  let ti = 0;
-  for (const w of windows) {
-    let cursor = w.start;
-    while (cursor + 40 <= w.end && ti < rest.length && used < budget) {
-      const task = rest[ti];
-      const dur = Math.min(task.minutes, w.end - cursor, budget - used);
-      if (dur < 35) break;
-      const { tier: _tier, ...slot } = task;
-      slots.push({
-        ...slot,
-        id: uid(),
-        start: fromMin(cursor),
-        end: fromMin(cursor + dur),
-        minutes: dur,
-      });
-      used += dur;
-      cursor += dur + 10;
-      ti += 1;
-    }
+    if (!placed) continue;
   }
   // Ders geçişlerini azalt: yerleşen görevleri DERS BLOĞU olarak yeniden sırala.
   //
-  // Görevler yukarıda öncelik sırasına göre yerleştirilir; bu yüzden aynı gün
-  // aynı dersin anlatım/pratik/tekrar işleri gün boyunca dağılıyor ve sürekli
-  // ders değişiyordu (ölçüm: gün başına ortalama 2,9 geçiş, en kötü 6). Burada
-  // YALNIZCA içerik sırası değişir: hangi görevlerin yerleştiği (dolayısıyla
-  // bütçe/kesme davranışı) aynı kalır. Zaman pencereleri korunur; içerik sırası
-  // değişince start/end dakikaları da pencerelere göre yeniden atanır, böylece
-  // program kesintisiz ve zaman sıralı kalır (ölçüm: ortalama 2,0 geçiş, en kötü 4).
-  // Rutin görevler (Paragraf/Problemler) günün başında korunur.
+  // YALNIZCA içerik sırası değişir; hangi görevlerin yerleştiği ve her görevin
+  // ÖZGÜN `minutes` değeri DEĞİŞMEZ. Zaman aralıkları, görevlerin kendi
+  // süreleriyle (sabit boyutlu kutular) ders blokları hâlinde yeniden dağıtılır:
+  // bir dersin görevleri ardışık kutulara yerleşir. Böylece ders geçişi azalırken
+  // 40 dk'lık görev 40, 55 dk'lık görev 55 dk kalır ve start/end kendi süresiyle
+  // tutarlı olur. Deneme bitişik bloğu ve rutin görevler (Paragraf/Problemler)
+  // dokunulmadan başta korunur.
   {
-    // Deneme bitişik bloğunu korur: yeniden sıralanmaz. Diğer görevler kendi
-    // zaman aralıkları arasında ders bloğu olarak yeniden sıralanır.
     const isMock = (s: PlanSlot) => s.kind === "Deneme";
     const isRoutine = (s: PlanSlot) =>
       !s.exam || s.topic === "Paragraf" || s.topic === "Problemler";
@@ -1293,17 +1379,43 @@ export function buildDailyPlan(
       if (list) list.push(s);
       else groups.set(k, [s]);
     }
-    const ordered = [...routines, ...[...groups.values()].flat()];
-    const windowsList = movable.map((s) => ({ start: s.start, end: s.end, minutes: s.minutes }));
-    ordered.forEach((s, i) => {
-      s.start = windowsList[i].start;
-      s.end = windowsList[i].end;
-      s.minutes = windowsList[i].minutes;
-    });
+    const ordered = [...groups.values()].flat();
+    // Zaman kutuları: taşınamayan görevler (deneme + rutin) sabit kalır; diğer
+    // görevler kendi süreleriyle bu boş kutulara sırayla oturur.
+    const fixed = [...mocks, ...routines].sort((a, b) => a.start.localeCompare(b.start));
+    const allRanges = freeWindows(settings, weekday);
+    const occupiedFixed = fixed.map((s) => ({ start: toMin(s.start), end: toMin(s.end) }));
+    const freeBoxes: { start: number; end: number }[] = [];
+    for (const w of allRanges) {
+      let segs = [{ start: w.start, end: w.end }];
+      for (const o of occupiedFixed) {
+        segs = segs.flatMap((sg) =>
+          o.end <= sg.start || o.start >= sg.end
+            ? [sg]
+            : [
+                ...(o.start > sg.start ? [{ start: sg.start, end: o.start }] : []),
+                ...(o.end < sg.end ? [{ start: o.end, end: sg.end }] : []),
+              ],
+        );
+      }
+      freeBoxes.push(...segs);
+    }
+    freeBoxes.sort((a, b) => a.start - b.start);
+    let bi = 0;
+    for (const s of ordered) {
+      const need = s.minutes;
+      while (bi < freeBoxes.length && freeBoxes[bi].end - freeBoxes[bi].start < need) bi += 1;
+      if (bi >= freeBoxes.length) break;
+      const start = freeBoxes[bi].start;
+      s.start = fromMin(start);
+      s.end = fromMin(start + need);
+      s.minutes = need;
+      freeBoxes[bi] = { start: start + need, end: freeBoxes[bi].end };
+    }
     slots.length = 0;
-    slots.push(...[...mocks, ...ordered].sort((a, b) => a.start.localeCompare(b.start)));
+    slots.push(...[...fixed, ...ordered].sort((a, b) => a.start.localeCompare(b.start)));
   }
-  return { slots, life };
+  return { slots, life, analyzedWrongIds, branchMockSubject };
 }
 
 export function buildWeekGrid(
