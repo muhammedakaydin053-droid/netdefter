@@ -1155,3 +1155,83 @@ describe("gerçek uygulama çağrı biçimi (Mod B)", () => {
     assert.ok(maxMs < 1000, `tek çağrı çok yavaş: ${maxMs} ms (replay geri gelmiş olabilir)`);
   });
 });
+
+describe("deneme günü yerleşimi", () => {
+  /** Deneme günlerini ve sürelerini toplar. */
+  function mockDays(days: number) {
+    let topics = seed();
+    const out: { date: string; minutes: number[] }[] = [];
+    for (let i = 0; i < days; i++) {
+      const date = addDays(S.programStart, i);
+      const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
+      const mocks = slots.filter((s) => s.kind === "Deneme");
+      if (mocks.length) out.push({ date, minutes: mocks.map((m) => m.minutes) });
+      for (const sl of slots) {
+        if (!sl.exam || sl.kind === "Deneme" || sl.kind === "Yanlış analizi") continue;
+        if (sl.kind === "Konu anlatımı") {
+          topics = topics.map((t) =>
+            t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic && t.status === "Başlamadım"
+              ? { ...t, status: "Çalışıyorum", lastStudy: date }
+              : t,
+          );
+        } else {
+          topics = topics.map((t) => {
+            if (!(t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic)) return t;
+            if (t.status === "Başlamadım") return t;
+            const q = Math.max(15, sl.targetQ || 15);
+            const total = (t.total ?? 0) + q;
+            const correct = (t.correct ?? 0) + Math.round(q * 0.78);
+            return { ...t, total, correct, lastStudy: date, status: total >= 15 && correct / total >= 0.7 ? "Bitti" : t.status };
+          });
+        }
+      }
+    }
+    return out;
+  }
+
+  it("tam deneme kırpılmaz (TYT 165 dk)", () => {
+    // Regresyon: deneme ilk küçük serbest pencereye sığdırılıp 165 dk -> 50 dk'ya
+    // kırpılıyordu (ölçüm: 2026-12-12/19/26). Tam deneme bitişik blok olmalı.
+    const days = mockDays(140);
+    assert.ok(days.length > 0, "hiç deneme günü yok");
+    for (const d of days) {
+      for (const m of d.minutes) {
+        assert.ok(m >= 165, `${d.date} denemesi kırpılmış: ${m} dk (tam 165–180 olmalı)`);
+      }
+    }
+  });
+
+  it("deneme günü yeni konu açmaz, pratiği geciktirmez", () => {
+    // Deneme günü yeni konu açılırsa pratiği ertesi günlere sarkıyordu.
+    const days = mockDays(140);
+    const mockDates = new Set(days.map((d) => d.date));
+    let topics = seed();
+    for (let i = 0; i < 140; i++) {
+      const date = addDays(S.programStart, i);
+      const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
+      if (mockDates.has(date)) {
+        const lect = slots.filter((s) => s.kind === "Konu anlatımı");
+        assert.equal(lect.length, 0, `${date} deneme gününde ${lect.length} yeni anlatım açıldı`);
+      }
+      for (const sl of slots) {
+        if (!sl.exam || sl.kind === "Deneme" || sl.kind === "Yanlış analizi") continue;
+        if (sl.kind === "Konu anlatımı") {
+          topics = topics.map((t) =>
+            t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic && t.status === "Başlamadım"
+              ? { ...t, status: "Çalışıyorum", lastStudy: date }
+              : t,
+          );
+        } else {
+          topics = topics.map((t) => {
+            if (!(t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic)) return t;
+            if (t.status === "Başlamadım") return t;
+            const q = Math.max(15, sl.targetQ || 15);
+            const total = (t.total ?? 0) + q;
+            const correct = (t.correct ?? 0) + Math.round(q * 0.78);
+            return { ...t, total, correct, lastStudy: date, status: total >= 15 && correct / total >= 0.7 ? "Bitti" : t.status };
+          });
+        }
+      }
+    }
+  });
+});

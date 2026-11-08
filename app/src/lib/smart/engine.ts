@@ -706,6 +706,9 @@ export function buildDailyPlan(
   // Deneme günü: kullanıcı seçimi + yoğun fazlarda hafta ortası ek deneme.
   const extraMockDay = phase.mockIntensity >= 2 && weekday === 3;
   const mockDay = (settings.mockWeekdays.includes(weekday) || extraMockDay) && !sunday;
+  // Deneme günü: 165–180 dk'lık tam deneme günün omurgasıdır. Bu bayrak denemenin
+  // bitişik yerleşmesini ve o gün yeni konu açılmamasını tetikler.
+  let mockFull = false;
   if (mockDay) {
     const tytReady = tytMockReady(topics, tytExams);
     const aytReady = aytMockReady(topics, tytExams, aytExams);
@@ -740,6 +743,7 @@ export function buildDailyPlan(
             : "Çekirdek matematiğin ~%40’ı bitti veya deneme kaydı var.",
       });
       budget = Math.max(budget, 210);
+      mockFull = true;
     }
   }
 
@@ -823,13 +827,18 @@ export function buildDailyPlan(
     topics.some(
       (t) => t.status === "Başlamadım" && !isOngoingTopic(t.exam, t.subject, t.topic),
     );
-  const perDayReserve = hasNewTopics ? pace.perDay : 0;
+  // Deneme gününde 165 dk deneme + 100 dk sabit görev kapasitenin çoğunu yer.
+  // O gün yeni konu açılmaz; kalan bütçe pratik/tekrara bırakılır. Aksi hâlde
+  // anlatılan konuların pratiği ertesi günlere sarkıyordu (ölçüm: 2026-12-23
+  // anlatımı 2026-12-27'de çözüldü, 4 gün).
+  const newCap = hasNewTopics ? (mockFull ? 0 : pace.perDay) : 0;
+  const perDayReserve = newCap;
   const split = splitBudget(budget, perDayReserve, fixedMinutes, {
     sunday,
     // Tekrarların pratiği açlığa itmemesi için pratiğe slot ayrılır. Her konu
     // 1 anlatım + 1 soru çözümü tükettiğinden, TYT bittikten sonra AYT'nin
     // tıkanmaması için pratik payı artırılır.
-    practiceSlots: hasNewTopics ? Math.max(1, Math.min(2, perDayReserve - 1)) : 0,
+    practiceSlots: mockFull ? 2 : hasNewTopics ? Math.max(1, Math.min(2, perDayReserve - 1)) : 0,
   });
   const used2 = new Set<string>();
   // İlerleme kapısı (sert sıra) için "öğrenilmiş" küme.
@@ -1079,7 +1088,7 @@ export function buildDailyPlan(
     awaitingBySubject.set(k, (awaitingBySubject.get(k) ?? 0) + 1);
   }
   for (const r of newCandidates) {
-    if (newCount >= pace.perDay) break;
+    if (newCount >= newCap) break;
     const isTyt = r.exam === "TYT";
     if (isTyt && tytNew >= pace.tytPerDay) continue;
     if (!isTyt && aytNew >= pace.aytPerDay) continue;
@@ -1174,13 +1183,50 @@ export function buildDailyPlan(
     });
   }
 
-  const windows = freeWindows(settings, weekday);
+  // Deneme, gerçek sınav gibi BİTİŞİK blok kaplar. Serbest pencereler yemek/
+  // dinlenme bloklarıyla bölündüğü için eski kod denemeyi ilk pencereye sığdırıp
+  // 165 dk'yı 50 dk'ya kırpıyordu (ölçüm: 2026-12-12/19/26). Deneme, KENDİSİNİ
+  // TUTAN EN BÜYÜK pencereye (Cumartesi 13:20–19:00, 340 dk) bütün yerleşir;
+  // kapladığı aralık diğer görevlerin pencerelerinden düşülür.
+  const allWindows = freeWindows(settings, weekday);
   let used = 0;
+  const occupied: { start: number; end: number }[] = [];
+  const rest = tasks.filter((t) => t.kind !== "Deneme");
+  for (const task of tasks.filter((t) => t.kind === "Deneme")) {
+    const need = Math.min(task.minutes, budget - used);
+    let idx = -1;
+    for (let i = 0; i < allWindows.length; i++) {
+      if (allWindows[i].end - allWindows[i].start < need) continue;
+      if (idx < 0 || allWindows[i].end - allWindows[i].start > allWindows[idx].end - allWindows[idx].start) idx = i;
+    }
+    if (idx < 0) continue;
+    const start = allWindows[idx].start;
+    const { tier: _tier, ...slot } = task;
+    slots.push({ ...slot, id: uid(), start: fromMin(start), end: fromMin(start + need), minutes: need });
+    used += need;
+    occupied.push({ start, end: start + need });
+  }
+  const windows: { start: number; end: number }[] = [];
+  for (const w of allWindows) {
+    let segments = [{ start: w.start, end: w.end }];
+    for (const o of occupied) {
+      segments = segments.flatMap((sg) =>
+        o.end <= sg.start || o.start >= sg.end
+          ? [sg]
+          : [
+              ...(o.start > sg.start ? [{ start: sg.start, end: o.start }] : []),
+              ...(o.end < sg.end ? [{ start: o.end, end: sg.end }] : []),
+            ],
+      );
+    }
+    windows.push(...segments);
+  }
+  windows.sort((a, b) => a.start - b.start);
   let ti = 0;
   for (const w of windows) {
     let cursor = w.start;
-    while (cursor + 40 <= w.end && ti < tasks.length && used < budget) {
-      const task = tasks[ti];
+    while (cursor + 40 <= w.end && ti < rest.length && used < budget) {
+      const task = rest[ti];
       const dur = Math.min(task.minutes, w.end - cursor, budget - used);
       if (dur < 35) break;
       const { tier: _tier, ...slot } = task;
@@ -1207,11 +1253,16 @@ export function buildDailyPlan(
   // program kesintisiz ve zaman sıralı kalır (ölçüm: ortalama 2,0 geçiş, en kötü 4).
   // Rutin görevler (Paragraf/Problemler) günün başında korunur.
   {
+    // Deneme bitişik bloğunu korur: yeniden sıralanmaz. Diğer görevler kendi
+    // zaman aralıkları arasında ders bloğu olarak yeniden sıralanır.
+    const isMock = (s: PlanSlot) => s.kind === "Deneme";
     const isRoutine = (s: PlanSlot) =>
       !s.exam || s.topic === "Paragraf" || s.topic === "Problemler";
-    const routines = slots.filter(isRoutine);
+    const mocks = slots.filter(isMock);
+    const movable = slots.filter((s) => !isMock(s));
+    const routines = movable.filter(isRoutine);
     const groups = new Map<string, PlanSlot[]>();
-    for (const s of slots) {
+    for (const s of movable) {
       if (isRoutine(s)) continue;
       const k = `${s.exam}|${s.subject}`;
       const list = groups.get(k);
@@ -1219,14 +1270,14 @@ export function buildDailyPlan(
       else groups.set(k, [s]);
     }
     const ordered = [...routines, ...[...groups.values()].flat()];
-    const windowsList = slots.map((s) => ({ start: s.start, end: s.end, minutes: s.minutes }));
+    const windowsList = movable.map((s) => ({ start: s.start, end: s.end, minutes: s.minutes }));
     ordered.forEach((s, i) => {
       s.start = windowsList[i].start;
       s.end = windowsList[i].end;
       s.minutes = windowsList[i].minutes;
     });
     slots.length = 0;
-    slots.push(...ordered);
+    slots.push(...[...mocks, ...ordered].sort((a, b) => a.start.localeCompare(b.start)));
   }
   return { slots, life };
 }
