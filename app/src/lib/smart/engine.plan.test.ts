@@ -1157,15 +1157,52 @@ describe("gerçek uygulama çağrı biçimi (Mod B)", () => {
 });
 
 describe("deneme günü yerleşimi", () => {
-  /** Deneme günlerini ve sürelerini toplar. */
-  function mockDays(days: number) {
+  /**
+   * Deneme günlerini, türlerini ve sürelerini toplar.
+   * `full`: o gün TAM deneme var mı (≥150 dk). Branş (40) ve mini (25) hariç.
+   */
+  function mockDays(days: number, withExams = false) {
     let topics = seed();
-    const out: { date: string; minutes: number[] }[] = [];
+    // AYT denemesi net ≥ 70 ve kapı açıklığı ister. Gerçek kullanıcıda TYT
+    // denemesi kaydı vardır; onu modellemek için yüksek netli kayıtlar eklenir.
+    const tytExams: any[] = withExams
+      ? [1, 2, 3].map((k) => ({
+          id: "t" + k,
+          date: addDays(S.programStart, 30 * k),
+          name: "TYT",
+          turD: 40, turY: 5, matD: 40, matY: 5, sosD: 20, sosY: 2, fenD: 20, fenY: 2,
+          note: "",
+        }))
+      : [];
+    const aytExams: any[] = [];
+    const out: { date: string; minutes: number[]; topics: string[]; full: boolean }[] = [];
     for (let i = 0; i < days; i++) {
       const date = addDays(S.programStart, i);
-      const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date, new Set());
+      const { slots } = E.buildDailyPlan(topics, [], [], tytExams, aytExams, S, [], date, new Set());
       const mocks = slots.filter((s: any) => s.kind === "Deneme");
-      if (mocks.length) out.push({ date, minutes: mocks.map((m: any) => m.minutes) });
+      if (mocks.length)
+        out.push({
+          date,
+          minutes: mocks.map((m: any) => m.minutes),
+          topics: mocks.map((m: any) => m.topic),
+          full: mocks.some((m: any) => m.minutes >= 150),
+        });
+      // Tam deneme çözülünce sonucu KAYDET: aksi hâlde deneme hep "gecikmiş"
+      // kalır ve denge kurulamaz (gerçek kullanıcı da sonucu girer).
+      for (const m of mocks) {
+        if (m.minutes < 150) continue;
+        if (m.exam === "TYT") {
+          tytExams.push({
+            id: "t" + date, date, name: "TYT",
+            turD: 35, turY: 5, matD: 30, matY: 5, sosD: 15, sosY: 2, fenD: 15, fenY: 2, note: "",
+          });
+        } else {
+          aytExams.push({
+            id: "a" + date, date, name: "AYT",
+            matD: 25, matY: 5, fizD: 10, fizY: 2, kimD: 8, kimY: 2, bioD: 8, bioY: 2, note: "",
+          });
+        }
+      }
       for (const sl of slots) {
         if (!sl.exam || sl.kind === "Deneme" || sl.kind === "Yanlış analizi") continue;
         if (sl.kind === "Konu anlatımı") {
@@ -1189,22 +1226,38 @@ describe("deneme günü yerleşimi", () => {
     return out;
   }
 
-  it("tam deneme kırpılmaz (TYT 165 dk)", () => {
+  it("tam deneme kırpılmaz ve süresi türüne göre doğrudur", () => {
     // Regresyon: deneme ilk küçük serbest pencereye sığdırılıp 165 dk -> 50 dk'ya
     // kırpılıyordu (ölçüm: 2026-12-12/19/26). Tam deneme bitişik blok olmalı.
-    const days = mockDays(140);
-    assert.ok(days.length > 0, "hiç deneme günü yok");
+    // Ayrıca süreler türe göre ayrıdır: TYT 165, AYT 180; branş 40, mini 25.
+    const days = mockDays(140, true);
+    const fulls = days.filter((d) => d.full);
+    assert.ok(fulls.length > 0, "hiç tam deneme günü yok");
+    for (const d of fulls) {
+      for (const m of d.minutes) {
+        if (m < 150) continue; // branş/mini ayrı kapsamda
+        assert.ok(m >= 165 && m <= 180, `${d.date} tam denemesi yanlış süre: ${m} dk (165–180 olmalı)`);
+      }
+    }
+    // Tür ayrımı: TYT (165) ve AYT (180) tam denemeleri AYRI sürelerle görülmeli.
+    const allMins = fulls.flatMap((d) => d.minutes).filter((m) => m >= 150);
+    assert.ok(allMins.includes(165), "hiç TYT tam denemesi (165 dk) yok");
+    assert.ok(allMins.includes(180), "hiç AYT tam denemesi (180 dk) yok");
+    // Branş/mini denemeler kısa olmalı; tam süre ALMAMALI.
     for (const d of days) {
       for (const m of d.minutes) {
-        assert.ok(m >= 165, `${d.date} denemesi kırpılmış: ${m} dk (tam 165–180 olmalı)`);
+        if (m >= 150) continue;
+        assert.ok(m === 40 || m === 25, `${d.date} kısa deneme süresi beklenmedik: ${m} dk (branş 40 / mini 25)`);
       }
     }
   });
 
-  it("deneme günü yeni konu açmaz, pratiği geciktirmez", () => {
-    // Deneme günü yeni konu açılırsa pratiği ertesi günlere sarkıyordu.
+  it("tam deneme günü yeni konu açmaz, pratiği geciktirmez", () => {
+    // Tam deneme günü yeni konu açılırsa pratiği ertesi günlere sarkıyordu.
+    // Kısıt YALNIZCA tam deneme içindir; branş/mini kısa olduğu için o gün yeni
+    // konu açılabilir.
     const days = mockDays(140);
-    const mockDates = new Set(days.map((d) => d.date));
+    const mockDates = new Set(days.filter((d) => d.full).map((d) => d.date));
     let topics = seed();
     for (let i = 0; i < 140; i++) {
       const date = addDays(S.programStart, i);
@@ -1304,4 +1357,125 @@ describe("çoklu senaryo simülasyonu", () => {
       assert.ok(r.mastered > 0, `${sc.name}: hiç konu öğrenilmedi`);
     });
   }
+});
+
+/**
+ * GERÇEK UYGULAMA ENTEGRASYONU — dönem simülasyonu.
+ *
+ * `runApp` bloğu Mod B donmasını yalnızca ilk 30–120 günde doğruluyor. Bu blok
+ * kullanıcının bildirdiği tam aralığı (09.11.2026 – 16.02.2027) gerçek ekran
+ * çağrısıyla (9. argüman YOK) işletir ve şu sözleşmeleri kilitler:
+ *   - 14.11.2026 sonrasında yeni konu üretimi devam eder,
+ *   - AYT Fizik 01.12.2026'da açılır, diğer AYT dersleri kendi kapılarında açılır,
+ *   - 184 öğretilebilir konu öğrenilme koşullarıyla ilerler,
+ *   - aynı anlatım görevi tekrar üretilmez,
+ *   - pratik / tekrar / eksik kapatma görevleri üretilir.
+ */
+describe("gerçek uygulama entegrasyonu (09.11.2026 – 16.02.2027)", () => {
+  const END = "2027-02-16";
+
+  /** Gerçek çağrı biçimiyle dönemi işletir; günlük kayıtları toplar. */
+  function runPeriod() {
+    let topics = seed();
+    const lectByDay: Record<string, string[]> = {};
+    const lectCount: Record<string, number> = {};
+    const kinds: Record<string, number> = {};
+    const mockByDay: Record<string, string[]> = {};
+    let emptyDays = 0;
+    let maxMs = 0;
+    for (let i = 0; ; i++) {
+      const date = addDays(S.programStart, i);
+      if (date > END) break;
+      const t0 = Date.now();
+      // 9. argüman YOK — program.tsx / smart-panels.tsx çağrısı.
+      const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], date);
+      maxMs = Math.max(maxMs, Date.now() - t0);
+      const academic = slots.filter((s: any) => s.exam && s.kind !== "Deneme" && s.kind !== "Yanlış analizi");
+      if (academic.length === 0) emptyDays += 1;
+      for (const sl of slots) {
+        kinds[sl.kind] = (kinds[sl.kind] ?? 0) + 1;
+        if (sl.kind === "Deneme") (mockByDay[date] ??= []).push(`${sl.exam} ${sl.minutes}dk`);
+        if (!sl.exam || sl.kind === "Deneme" || sl.kind === "Yanlış analizi") continue;
+        const key = `${sl.exam}|${sl.subject}|${sl.topic}`;
+        if (sl.kind === "Konu anlatımı") {
+          (lectByDay[date] ??= []).push(key);
+          lectCount[key] = (lectCount[key] ?? 0) + 1;
+          topics = topics.map((t) =>
+            t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic && t.status === "Başlamadım"
+              ? { ...t, status: "Çalışıyorum", lastStudy: date }
+              : t,
+          );
+        } else {
+          topics = topics.map((t) => {
+            if (!(t.exam === sl.exam && t.subject === sl.subject && t.topic === sl.topic)) return t;
+            if (t.status === "Başlamadım") return t;
+            const q = Math.max(15, sl.targetQ || 15);
+            const total = (t.total ?? 0) + q;
+            const correct = (t.correct ?? 0) + Math.round(q * 0.78);
+            return { ...t, total, correct, lastStudy: date, status: total >= 15 && correct / total >= 0.7 ? "Bitti" : t.status };
+          });
+        }
+      }
+    }
+    const taught = Object.keys(lectCount);
+    const repeated = Object.entries(lectCount).filter(([, c]) => c > 1);
+    const lectDates = Object.keys(lectByDay).sort();
+    return { topics, lectByDay, lectCount, kinds, mockByDay, emptyDays, maxMs, taught, repeated, lectDates };
+  }
+
+  // Tembel: `describe` gövdesi `before()`'dan önce çalışır ve `curriculum`
+  // henüz yüklenmemiştir; bu yüzden dönem ilk testte bir kez işletilir.
+  let R: ReturnType<typeof runPeriod>;
+  before(() => { R = runPeriod(); });
+
+  it("14.11.2026 sonrasında yeni konu üretimi durmaz", () => {
+    const after = R.lectDates.filter((d) => d > "2026-11-14");
+    assert.ok(after.length >= 50, `14.11 sonrası anlatım günü çok az: ${after.length}`);
+    assert.ok(R.lectDates.includes(END), "dönemin son gününde de anlatım üretilmeli");
+  });
+
+  it("AYT Fizik 01.12.2026'da açılır", () => {
+    const fiz = R.lectDates.filter((d) => (R.lectByDay[d] ?? []).some((k) => k.startsWith("AYT|Fizik")));
+    assert.ok(fiz.length > 0, "AYT Fizik hiç açılmadı");
+    assert.equal(fiz[0], "2026-12-01", `AYT Fizik ilk anlatımı ${fiz[0]} (beklenen 2026-12-01)`);
+  });
+
+  it("Kimya, Biyoloji ve Matematik kendi kapılarında açılır", () => {
+    const firstOf = (prefix: string) =>
+      R.lectDates.find((d) => (R.lectByDay[d] ?? []).some((k) => k.startsWith(prefix)));
+    const kim = firstOf("AYT|Kimya");
+    const bio = firstOf("AYT|Biyoloji");
+    const mat = firstOf("AYT|Matematik");
+    assert.ok(kim, "AYT Kimya açılmadı");
+    assert.ok(bio, "AYT Biyoloji açılmadı");
+    assert.ok(mat, "AYT Matematik açılmadı");
+    // Kapı sırası: Fizik (4 konu) < Kimya (5) < Matematik (12) beklenir.
+    assert.ok(kim! >= "2026-12-01", `AYT Kimya çok erken: ${kim}`);
+    assert.ok(bio! >= "2026-12-01", `AYT Biyoloji çok erken: ${bio}`);
+  });
+
+  it("184 öğretilebilir konunun çoğu dönemde işlenir, öğrenilme koşulu korunur", () => {
+    const teachable = expectedLeftTopics();
+    assert.equal(teachable, 184, `öğretilebilir konu 184 olmalı, ${teachable} bulundu`);
+    assert.ok(R.taught.length >= 160, `dönemde işlenen konu az: ${R.taught.length}`);
+    // "Bitti" yalnızca 15 soru + %70 koşuluyla atanır; koşulsuz Bitti olmamalı.
+    for (const t of R.topics) {
+      if (t.status !== "Bitti") continue;
+      assert.ok((t.total ?? 0) >= 15, `${t.id} öğrenilme koşulu olmadan Bitti`);
+      assert.ok((t.correct ?? 0) / (t.total ?? 1) >= 0.7, `${t.id} %70 altında Bitti`);
+    }
+    assert.ok(R.topics.some((t: any) => t.status === "Bitti"), "hiç konu öğrenilmedi");
+  });
+
+  it("aynı anlatım görevi tekrar tekrar üretilmez", () => {
+    assert.equal(R.repeated.length, 0, `tekrar eden anlatım: ${R.repeated.map(([k, c]) => `${k}x${c}`).join(", ")}`);
+  });
+
+  it("pratik, tekrar ve eksik kapatma görevleri çalışır", () => {
+    assert.ok((R.kinds["Soru çözümü"] ?? 0) > 100, "soru çözümü üretilmedi");
+    assert.ok((R.kinds["Tekrar"] ?? 0) > 0, "tekrar üretilmedi");
+    assert.ok((R.kinds["Deneme"] ?? 0) > 0, "deneme üretilmedi");
+    assert.equal(R.emptyDays, 0, `${R.emptyDays} boş akademik gün var`);
+    assert.ok(R.maxMs < 1000, `tek çağrı yavaş: ${R.maxMs} ms`);
+  });
 });

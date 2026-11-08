@@ -5,6 +5,8 @@ import { countsIssue, n, pctOf, sanitizeCounts } from "@/lib/calc";
 import { MIN_QUESTIONS_FOR_MASTERED, MASTERY_RATIO } from "@/lib/smart/progress";
 import { splitBudget, capacity, dailyCapacity, type DayLoad } from "@/lib/smart/budget";
 import { topicAggregates, aytNets, tytNets, dailyTotals } from "@/lib/stats";
+import { overallCoverage, subjectCoverage } from "@/lib/smart/mock-plan";
+import { chooseMock } from "@/lib/smart/mock-model";
 import type { AytExam, DailyRow, TopicRow, TytExam, WrongRow } from "@/lib/types";
 import { addDaysISO, todayISO, uid } from "@/lib/utils";
 import type {
@@ -714,36 +716,58 @@ export function buildDailyPlan(
     const aytReady = aytMockReady(topics, tytExams, aytExams);
     const lastAyt = [...aytExams].filter((e) => e.date).sort((a, b) => a.date.localeCompare(b.date)).at(-1);
     const lastTyt = [...tytExams].filter((e) => e.date).sort((a, b) => a.date.localeCompare(b.date)).at(-1);
-    const aytDue = !lastAyt || daysBetween(lastAyt.date, today) >= 14;
-    const tytDue = !lastTyt || daysBetween(lastTyt.date, today) >= (phase.mockIntensity >= 2 ? 4 : 7);
-    if (aytReady && aytDue) {
+    const tytInterval = phase.mockIntensity >= 2 ? 4 : 7;
+    const aytInterval = 14;
+    // Gecikme günleri: hiç deneme yoksa Infinity (zamanı gelmiş sayılır).
+    const tytOverdueDays = lastTyt ? daysBetween(lastTyt.date, today) : Infinity;
+    const aytOverdueDays = lastAyt ? daysBetween(lastAyt.date, today) : Infinity;
+    // Branş denemesi için en zayıf, kapsamı yeterli (%50+) ders. Kapsam çok
+    // düşükken branş denemesi konu eksikliğini ölçer, yanıltıcıdır.
+    const branchSubject =
+      ["Türkçe", "Matematik", "Geometri", "Fizik", "Kimya", "Biyoloji"]
+        .map((sub) => ({ sub, cov: subjectCoverage(topics, "TYT", sub) }))
+        .filter((x) => x.cov >= 0.5)
+        .sort((a, b) => a.cov - b.cov)[0]?.sub ?? null;
+    // Deneme türü seçimi saf modelde (`mock-model.ts`): tam TYT / tam AYT /
+    // branş / mini. Süreler gerçek sınav sürelerinden gelir; hepsine 165 dk
+    // vermek yanlıştı. TYT/AYT dengesi gecikmeye göre kurulur.
+    const mock = chooseMock({
+      isMockDay: mockDay,
+      tytReady,
+      tytOverdueDays,
+      tytInterval,
+      aytReady,
+      aytOverdueDays,
+      aytInterval,
+      branchSubject,
+      overallCoverage: overallCoverage(topics, "TYT"),
+    });
+    if (mock) {
       tasks.push({
-        exam: "AYT",
-        subject: "Deneme",
-        topic: "AYT sayısal denemesi",
+        exam: mock.exam,
+        subject: mock.subject,
+        topic: mock.topic,
         kind: "Deneme",
-        targetQ: 80,
-        minutes: 180,
-        priority: "yüksek",
-        reason: `Son TYT net ≥ 70 ve AYT kapısı açık. ${phase.title} fazı, 14 günde bir.`,
-      });
-      budget = Math.max(budget, 210);
-    } else if (tytReady && tytDue) {
-      tasks.push({
-        exam: "TYT",
-        subject: "Deneme",
-        topic: "TYT denemesi",
-        kind: "Deneme",
-        targetQ: 120,
-        minutes: 165,
-        priority: "yüksek",
+        targetQ: mock.targetQ,
+        minutes: mock.minutes,
+        priority: mock.type === "tam" ? "yüksek" : "orta",
         reason:
-          phase.mockIntensity >= 2
-            ? `${phase.title} fazı: deneme sıklığı arttı, haftada iki.`
-            : "Çekirdek matematiğin ~%40’ı bitti veya deneme kaydı var.",
+          mock.type === "tam"
+            ? mock.exam === "AYT"
+              ? `Son TYT net ≥ 70 ve AYT kapısı açık. ${phase.title} fazı, 14 günde bir.`
+              : phase.mockIntensity >= 2
+                ? `${phase.title} fazı: deneme sıklığı arttı, haftada iki.`
+                : "Çekirdek matematiğin ~%40’ı bitti veya deneme kaydı var."
+            : mock.type === "brans"
+              ? `Tam deneme zamanı gelmedi; en zayıf ders ölçülür (${mock.subject}).`
+              : "Kapsam henüz branş denemesine yetmiyor; deneme ritmi mini denemeyle korunur.",
       });
-      budget = Math.max(budget, 210);
-      mockFull = true;
+      // Tam deneme günün omurgasıdır: bitişik yerleşir ve o gün yeni konu
+      // açılmaz. Branş/mini kısa olduğu için bu kısıt uygulanmaz.
+      if (mock.type === "tam") {
+        budget = Math.max(budget, 210);
+        mockFull = true;
+      }
     }
   }
 
