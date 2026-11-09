@@ -66,6 +66,8 @@ interface Metrics {
   kinds: Record<string, number>;
   mockType: Record<string, number>;
   fullByExam: { TYT: number; AYT: number };
+  /** Tam denemeler, tarih ve sınav türüyle (dönemsel dağılım analizi için). */
+  fullMocks: { date: string; exam: "TYT" | "AYT" }[];
   branchBySubject: Record<string, number>;
   emptyDays: number;
   overCapacityDays: number;
@@ -101,6 +103,7 @@ function runPeriod(opts: { withData: boolean | "both" }): Metrics {
   const kinds: Record<string, number> = {};
   const mockType = { tam: 0, brans: 0, mini: 0 } as Record<string, number>;
   const fullByExam = { TYT: 0, AYT: 0 };
+  const fullMocks: { date: string; exam: "TYT" | "AYT" }[] = [];
   const branchBySubject: Record<string, number> = {};
   const capUsage: number[] = [];
   const scheduledWrongIds = new Set<string>();
@@ -147,8 +150,12 @@ function runPeriod(opts: { withData: boolean | "both" }): Metrics {
     for (const sl of r.slots) {
       kinds[sl.kind] = (kinds[sl.kind] ?? 0) + 1;
       if (sl.kind === "Deneme") {
-        mockType[classifyMock(sl)] += 1;
-        if (classifyMock(sl) === "tam") fullByExam[sl.exam as "TYT" | "AYT"] += 1;
+        const kind = classifyMock(sl);
+        mockType[kind] += 1;
+        if (kind === "tam") {
+          fullByExam[sl.exam as "TYT" | "AYT"] += 1;
+          fullMocks.push({ date, exam: sl.exam as "TYT" | "AYT" });
+        }
       }
       if (sl.exam === "AYT" && sl.kind === "Konu anlatımı") {
         (lectureDates[sl.subject] ??= []).push(date);
@@ -252,6 +259,7 @@ function runPeriod(opts: { withData: boolean | "both" }): Metrics {
     kinds,
     mockType,
     fullByExam,
+    fullMocks,
     branchBySubject,
     emptyDays,
     overCapacityDays,
@@ -444,21 +452,6 @@ describe("TYT–AYT tam deneme dengesi (sonuç kaydından bağımsız)", () => {
     }
   });
 
-  it("sonuç kaydı deneme dağılımını tersine çevirmez", () => {
-    // TYT/AYT oranı senaryolar arasında dar bir bantta kalmalı (yaklaşık 2:1).
-    const ratio = (m: Metrics) => m.fullByExam.TYT / m.fullByExam.AYT;
-    const r1 = ratio(noResult);
-    const r2 = ratio(onlyTyt);
-    const r3 = ratio(both);
-    for (const [label, r] of [["sonuç yok", r1], ["yalnız TYT", r2], ["TYT+AYT", r3]] as const) {
-      assert.ok(r >= 1.5 && r <= 3.0, `${label}: TYT/AYT oranı ${r.toFixed(2)} beklenen 1.5–3.0 dışında`);
-    }
-    assert.ok(
-      Math.max(r1, r2, r3) / Math.min(r1, r2, r3) <= 1.5,
-      `oran senaryolar arası savruluyor: ${r1.toFixed(2)}, ${r2.toFixed(2)}, ${r3.toFixed(2)}`,
-    );
-  });
-
   it("hiçbir senaryoda AYT tam denemesi bastırılmaz", () => {
     for (const [label, m] of [["sonuç yok", noResult], ["yalnız TYT", onlyTyt], ["TYT+AYT", both]] as const) {
       assert.ok(m.fullByExam.AYT >= 5, `${label}: AYT tam denemesi çok az (${m.fullByExam.AYT})`);
@@ -475,6 +468,111 @@ describe("TYT–AYT tam deneme dengesi (sonuç kaydından bağımsız)", () => {
         tytAyt: both.fullByExam,
       }),
     );
+    assert.ok(true);
+  });
+});
+
+// Dönem sınırları: 2:1 fazı (TYT ilk turu), 1:1 fazı (ilk tur sonrası) ve son
+// 60 gün. 1:1 kuralı 06.02.2027'de (round1Done) ve 20.04.2027'de (≤60 gün)
+// devreye girer; ikinci dönem round1Done ile, üçüncü dönem her iki koşulla da
+// kapsanır.
+const PERIODS = [
+  { id: "P1", label: "10.11.2026–05.02.2027 (2:1 fazı)", from: "2026-11-10", to: "2027-02-05", rule: "2:1" as const },
+  { id: "P2", label: "06.02.2027–20.04.2027 (round1 sonrası 1:1)", from: "2027-02-06", to: "2027-04-20", rule: "1:1" as const },
+  { id: "P3", label: "21.04.2027–20.06.2027 (son 60 gün 1:1)", from: "2027-04-21", to: "2027-06-20", rule: "1:1" as const },
+];
+
+function periodCounts(m: Metrics, p: (typeof PERIODS)[number]) {
+  const rows = m.fullMocks.filter((f) => f.date >= p.from && f.date <= p.to);
+  const tyt = rows.filter((r) => r.exam === "TYT").length;
+  const ayt = rows.filter((r) => r.exam === "AYT").length;
+  return { tyt, ayt, rows };
+}
+
+describe("dönemsel tam deneme dağılımı (tarih bazlı)", () => {
+  let noResult: Metrics;
+  let onlyTyt: Metrics;
+  let both: Metrics;
+  before(() => {
+    noResult = runPeriod({ withData: false });
+    onlyTyt = runPeriod({ withData: true });
+    both = runPeriod({ withData: "both" } as never);
+  });
+
+  it("P1 (2:1 fazı) — TYT ağırlıklı, AYT tamamen bastırılmaz", () => {
+    for (const [label, m] of [["sonuç yok", noResult], ["yalnız TYT", onlyTyt], ["TYT+AYT", both]] as const) {
+      const { tyt, ayt } = periodCounts(m, PERIODS[0]);
+      assert.ok(tyt > 0, `${label}: P1'de TYT tam denemesi yok`);
+      assert.ok(tyt >= ayt, `${label}: P1 TYT ${tyt} < AYT ${ayt} (2:1 fazı TYT ağırlıklı olmalı)`);
+    }
+  });
+
+  it("P2 (round1 sonrası 1:1) — AYT tam denemesi gerçekten üretilir, TYT'ye kaymaz", () => {
+    // Regresyon: kadans ile dönüşüm aynı sayaca bağlıyken bu dönem 5 TYT / 0 AYT
+    // üretiyordu (1:1 kuralı aktif ama etkisizdi).
+    for (const [label, m] of [["sonuç yok", noResult], ["yalnız TYT", onlyTyt], ["TYT+AYT", both]] as const) {
+      const { tyt, ayt } = periodCounts(m, PERIODS[1]);
+      assert.ok(tyt + ayt >= 4, `${label}: P2'de yeterli tam deneme yok (${tyt + ayt})`);
+      assert.ok(ayt >= 2, `${label}: P2'de AYT tam denemesi yetersiz (${ayt}) — 1:1 uygulanmıyor`);
+      // Sistematik TYT kayması yok: oran 2:1'i aşmamalı.
+      assert.ok(tyt <= ayt + 1, `${label}: P2 TYT ${tyt} / AYT ${ayt} — TYT lehine sistematik kayma`);
+    }
+  });
+
+  it("P3 (son 60 gün 1:1) — dağılım dengeli (oran 1:1 civarı)", () => {
+    for (const [label, m] of [["sonuç yok", noResult], ["yalnız TYT", onlyTyt], ["TYT+AYT", both]] as const) {
+      const { tyt, ayt } = periodCounts(m, PERIODS[2]);
+      assert.ok(tyt + ayt >= 10, `${label}: P3'te yeterli tam deneme yok (${tyt + ayt})`);
+      assert.ok(ayt >= 5, `${label}: P3'te AYT tam denemesi yetersiz (${ayt})`);
+      const ratio = tyt / ayt;
+      assert.ok(ratio >= 0.75 && ratio <= 1.33, `${label}: P3 TYT/AYT oranı ${ratio.toFixed(2)} (1:1 olmalı)`);
+    }
+  });
+
+  it("1:1 dönemleri (P2+P3) toplamda 1:1'e oturur", () => {
+    for (const [label, m] of [["sonuç yok", noResult], ["yalnız TYT", onlyTyt], ["TYT+AYT", both]] as const) {
+      const p2 = periodCounts(m, PERIODS[1]);
+      const p3 = periodCounts(m, PERIODS[2]);
+      const tyt = p2.tyt + p3.tyt;
+      const ayt = p2.ayt + p3.ayt;
+      assert.ok(Math.abs(tyt - ayt) <= 2, `${label}: 1:1 dönemleri TYT ${tyt} / AYT ${ayt} — dengesiz`);
+    }
+  });
+
+  it("sonuç kaydı dönemsel dağılımı değiştirmez (üç senaryo tutarlı)", () => {
+    for (const p of PERIODS) {
+      const counts = [noResult, onlyTyt, both].map((m) => periodCounts(m, p));
+      const tytValues = counts.map((c) => c.tyt);
+      const aytValues = counts.map((c) => c.ayt);
+      assert.ok(
+        Math.max(...tytValues) - Math.min(...tytValues) <= 2,
+        `${p.label}: TYT sayıları senaryolar arası savruluyor (${tytValues.join(", ")})`,
+      );
+      assert.ok(
+        Math.max(...aytValues) - Math.min(...aytValues) <= 2,
+        `${p.label}: AYT sayıları senaryolar arası savruluyor (${aytValues.join(", ")})`,
+      );
+    }
+  });
+
+  it("deneme kadansı bozulmaz (branş/mini gereksiz artmaz, boş deneme günü olmaz)", () => {
+    for (const [label, m] of [["sonuç yok", noResult], ["yalnız TYT", onlyTyt], ["TYT+AYT", both]] as const) {
+      assert.equal(m.mockType.mini, 0, `${label}: mini deneme beklenmiyordu (${m.mockType.mini})`);
+      assert.ok(m.mockType.brans <= 14, `${label}: branş denemesi arttı (${m.mockType.brans})`);
+      assert.ok(m.mockType.tam >= 24, `${label}: tam deneme azaldı (${m.mockType.tam})`);
+      assert.equal(m.emptyDays, 0, `${label}: boş akademik gün`);
+      assert.equal(m.overCapacityDays, 0, `${label}: kapasite aşımı`);
+    }
+  });
+
+  it("rapor — dönemsel dağılım (bilgi amaçlı)", () => {
+    for (const [label, m] of [["sonuç yok", noResult], ["yalnız TYT", onlyTyt], ["TYT+AYT", both]] as const) {
+      const parts = PERIODS.map((p) => {
+        const c = periodCounts(m, p);
+        return `${p.id} ${c.tyt}/${c.ayt}`;
+      });
+      console.log(`DÖNEM DAĞILIMI (${label}):`, parts.join(" | "));
+    }
     assert.ok(true);
   });
 });

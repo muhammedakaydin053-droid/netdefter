@@ -38,25 +38,41 @@ function daysBetween(a: string, b: string) {
 }
 
 /**
- * `from` ile `to` arasında kaç DENEME GÜNÜ geçtiği (deneme fırsatı sayacı).
+ * `from` ile `to` arasındaki deneme günü sayaçları (program başından bugüne,
+ * bugün dahil). İki AYRI değer döner:
+ *   - `mockDays`: deneme günü sayısı — tam deneme KADANSININ tabanı.
+ *   - `fullMockDays`: TAM deneme günü sayısı — sınav (TYT/AYT) DÖNÜŞÜMÜNÜN tabanı.
  *
- * Tam deneme sınavı seçimi bu sayaçla TAKVİM dönüşümüne bağlanır; kullanıcının
- * hangi sınavın sonucunu girdiğine bakmaz. Sayım, program başından bugüne
- * (bugün dahil) deneme günlerini sayar. Deneme günü kuralı `buildDailyPlan` ile
- * aynıdır: hafta sonu hariç, `mockWeekdays` veya yoğun fazda hafta ortası (Çrş).
+ * Neden ayrı: kadans ile dönüşüm aynı sayacı kullanırsa ikisi de aynı pariteye
+ * bağlanır. Düşük yoğunluklu fazda (mockIntensity < 2) tam denemeler yalnızca
+ * çift `mockDays`'te olur; 2'li dönüşümde çift indeks daima TYT'ye denk gelir ve
+ * 1:1 dönemi pratikte hiç AYT üretmez (gözlenen: 5 TYT / 0 AYT). Dönüşüm bu
+ * yüzden `fullMockDays`'e bağlanır; art arda gelen TAM denemeler sırayla
+ * TYT/AYT alır. Sayaç yine TAKVİME bağlıdır, kullanıcı kaydına bakmaz.
+ *
+ * Deneme günü kuralı `buildDailyPlan` ile aynıdır: hafta sonu hariç,
+ * `mockWeekdays` veya yoğun fazda hafta ortası (Çrş).
  */
-function countMockDays(settings: ScheduleSettings, from: string, to: string): number {
-  if (!from || !to || to < from) return 0;
+function mockDayCounters(
+  settings: ScheduleSettings,
+  from: string,
+  to: string,
+): { mockDays: number; fullMockDays: number } {
+  if (!from || !to || to < from) return { mockDays: 0, fullMockDays: 0 };
   const timeline = buildTimeline(settings.programStart || from, settings.examDate || to);
-  let count = 0;
+  let mockDays = 0;
+  let fullMockDays = 0;
   for (let d = from; d <= to; d = addDaysISO(d, 1)) {
     const wd = new Date(d + "T12:00:00").getDay();
     if (wd === 0) continue;
     const ph = phaseFor(timeline, d);
     const extra = ph.mockIntensity >= 2 && wd === 3;
-    if (settings.mockWeekdays.includes(wd) || extra) count += 1;
+    if (!(settings.mockWeekdays.includes(wd) || extra)) continue;
+    mockDays += 1;
+    const due = mockDays === 1 || (ph.mockIntensity >= 2 ? true : mockDays % 2 === 0);
+    if (due) fullMockDays += 1;
   }
-  return count;
+  return { mockDays, fullMockDays };
 }
 
 function toMin(hhmm: string) {
@@ -764,10 +780,15 @@ export function buildDailyPlan(
     // takvim dönüşümüyle belirlenir; kullanıcının hangi sonucu girdiği temel
     // TYT–AYT dağılımını değiştirmez (yalnızca hazırbulunuşluk etkiler).
     //
-    // `mockOrdinal` deneme FIRSATI sayacıdır: program başından bugüne kadar
-    // geçen deneme günü sayısı. Sonuç kaydına bakmaz, böylece yalnız TYT (veya
-    // yalnız AYT) sonucu girilse de dağılım tersine dönmez.
-    const mockOrdinal = countMockDays(settings, settings.programStart, today);
+    // `mockOrdinal` deneme günü sayacıdır (tam deneme KADANSI), `fullMockOrdinal`
+    // ise tam deneme sayacıdır (sınav DÖNÜŞÜMÜ). İkisi ayrı tutulur; aksi hâlde
+    // kadans ile dönüşüm aynı pariteye bağlanıp 1:1 döneminde hep TYT üretilir.
+    // Her iki sayaç da TAKVİME bağlıdır, sonuç kaydına bakmaz.
+    const { mockDays: mockOrdinal, fullMockDays: fullMockOrdinal } = mockDayCounters(
+      settings,
+      settings.programStart,
+      today,
+    );
     const daysToTytExam = daysBetween(today, settings.examDate || today);
     // TAM deneme kadansı (TAKVİME bağlı, sonuç kaydından bağımsız). İlk deneme
     // gününde başlar; faz yoğunluğu 2 olduğunda her deneme günü tam denemeye
@@ -789,7 +810,7 @@ export function buildDailyPlan(
       aytReady,
       branchSubject: branch?.subject ?? null,
       overallCoverage: overallCoverage(topics, "TYT"),
-      rotationIndex: mockOrdinal,
+      rotationIndex: fullMockOrdinal,
       daysToTytExam,
       tytRound1Done,
     });
