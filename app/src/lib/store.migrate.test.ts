@@ -184,3 +184,94 @@ describe("migratePersistedState + merge — gerçek akış", () => {
     assert.equal(merged.archivedTopics.length, 1, "arşiv kayboldu");
   });
 });
+
+/**
+ * Zincir sürekliliği ve veri bütünlüğü — her eski sürüm TEK çağrıda v4'e ulaşır
+ * ve kullanıcı verisi hiçbir adımda kaybolmaz. `programStart` dışındaki tüm
+ * alanlar (konu, yanlış, deneme, günlük, arşiv, carry, diğer ayarlar) korunur.
+ */
+describe("migratePersistedState — zincir sürekliliği (v0..v4 → v4)", () => {
+  const STARTS: [number, string, string][] = [
+    [0, "2026-11-01", "v0"],
+    [1, "2026-11-04", "v1"],
+    [2, "2026-11-05", "v2"],
+    [3, "2026-11-09", "v3"],
+  ];
+
+  for (const [fromVersion, start, label] of STARTS) {
+    it(`${label} (programStart ${start}) tek çağrıda v4'e ulaşır, veri korunur`, () => {
+      const src = legacyState({ settings: { programStart: start, examDate: "2027-06-19", studyMinutes: 240, weeklyHours: 26 } });
+      const out: any = S.migratePersistedState(src, fromVersion);
+      assert.equal(out.settings.programStart, "2026-11-10", `${label}: hedefe ulaşmadı`);
+      // Kullanıcı verisi hiçbir adımda kaybolmaz.
+      assert.deepEqual(out.topics, src.topics, `${label}: konular kayboldu`);
+      assert.deepEqual(out.wrongs, src.wrongs, `${label}: yanlışlar kayboldu`);
+      assert.deepEqual(out.tytExams, src.tytExams, `${label}: TYT denemeleri kayboldu`);
+      assert.deepEqual(out.aytExams, src.aytExams, `${label}: AYT denemeleri kayboldu`);
+      assert.deepEqual(out.daily, src.daily, `${label}: günlük kayıtlar kayboldu`);
+      assert.deepEqual(out.archivedTopics, src.archivedTopics, `${label}: arşiv kayboldu`);
+      assert.deepEqual(out.carry, src.carry, `${label}: carry kayboldu`);
+      assert.equal(out.settings.examDate, "2027-06-19", `${label}: examDate bozuldu`);
+      assert.equal(out.settings.studyMinutes, 240, `${label}: studyMinutes bozuldu`);
+      assert.equal(out.settings.weeklyHours, 26, `${label}: weeklyHours bozuldu`);
+    });
+  }
+
+  it("v4 kaydı yeniden açılışta veri kaybı olmadan aynen korunur", () => {
+    const src = legacyState({ settings: { programStart: "2026-11-10", examDate: "2027-06-19" } });
+    const out: any = S.migratePersistedState(src, 4);
+    // Hiçbir alan değişmemeli: programStart dahil tüm veri aynen kalır.
+    assert.deepEqual(out.settings, src.settings, "v4 yeniden açılışta ayarlar değişti");
+    assert.deepEqual(out.topics, src.topics);
+    assert.deepEqual(out.wrongs, src.wrongs);
+    assert.deepEqual(out.daily, src.daily);
+    assert.deepEqual(out.carry, src.carry);
+  });
+
+  it("daha yeni sürüm (v5+) girdisi de dokunulmadan bırakılır", () => {
+    const src = legacyState({ settings: { programStart: "2026-11-01" } });
+    const out: any = S.migratePersistedState(src, 5);
+    assert.equal(out.settings.programStart, "2026-11-01", "gelecek sürüm yanlışlıkla migre edildi");
+  });
+
+  it("zincirin tüm ara değerleri tek çağrıda atlanır (v0 → v4, ara adımlar kalmaz)", () => {
+    const out: any = S.migratePersistedState(legacyState(), 0);
+    for (const s of ["2026-11-04", "2026-11-05", "2026-11-09"]) {
+      assert.notEqual(out.settings.programStart, s, `ara değerde takıldı: ${s}`);
+    }
+    assert.equal(out.settings.programStart, "2026-11-10");
+  });
+});
+
+/**
+ * Eksik yeni alanların GÜVENLİ VARSAYILANLARLA oluşturulması.
+ *
+ * `analyzedWrongs` ve `branchMockHistory` v4'te eklendi. `migratePersistedState`
+ * bu alanları EKLEMEZ (yalnızca programStart'ı taşır); güvenli varsayılan store
+ * `merge` katmanında uygulanır (`?? {}`). Bu blok, eski kayıtlarda alanlar
+ * yokken birleştirmenin boş nesneyle güvenle sonuçlandığını kilitler.
+ */
+describe("eksik yeni alanlar güvenli varsayılanla oluşturulur", () => {
+  it("eski kayıtta analyzedWrongs/branchMockHistory yoksa birleştirme boş nesne verir", async () => {
+    const D = (await server.ssrLoadModule("/src/lib/smart/types.ts")).DEFAULT_SETTINGS;
+    // v0 kaydında bu alanlar yoktur.
+    const migrated: any = S.migratePersistedState(legacyState(), 0);
+    assert.equal(migrated.analyzedWrongs, undefined, "migrasyon beklenmedik alan ekledi");
+    assert.equal(migrated.branchMockHistory, undefined, "migrasyon beklenmedik alan ekledi");
+    // store.ts `merge` ile aynı kural:
+    const merged = {
+      ...D,
+      analyzedWrongs: migrated.analyzedWrongs ?? {},
+      branchMockHistory: migrated.branchMockHistory ?? {},
+    };
+    assert.deepEqual(merged.analyzedWrongs, {});
+    assert.deepEqual(merged.branchMockHistory, {});
+  });
+
+  it("kayıtta alanlar varsa aynen korunur (varsayılan ezmez)", () => {
+    const src = legacyState({ analyzedWrongs: { w1: "2026-11-02" }, branchMockHistory: { "TYT|Fizik": "2026-11-01" } });
+    const out: any = S.migratePersistedState(src, 0);
+    assert.deepEqual(out.analyzedWrongs, { w1: "2026-11-02" });
+    assert.deepEqual(out.branchMockHistory, { "TYT|Fizik": "2026-11-01" });
+  });
+});

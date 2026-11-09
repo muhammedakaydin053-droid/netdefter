@@ -1,9 +1,10 @@
 import { frequencyScore, frequencyTier, DISTRIBUTION } from "@/data/distribution";
 import { aytMockReady, aytUnlocks, isGaranti, tytMockReady } from "@/data/roadmap";
 import { buildTimeline, isCoreTopic, isOngoingTopic, orderAllowed, orderBoost, phaseFor } from "@/data/sequence";
+import { TARGETS } from "@/data/targets";
 import { countsIssue, n, pctOf, sanitizeCounts } from "@/lib/calc";
 import { MIN_QUESTIONS_FOR_MASTERED, MASTERY_RATIO, learningStage } from "@/lib/smart/progress";
-import { splitBudget, capacity, dailyCapacity, type DayLoad } from "@/lib/smart/budget";
+import { splitBudget, capacity, dailyCapacity, TOPIC_MINUTES, type DayLoad } from "@/lib/smart/budget";
 import { topicAggregates, aytNets, tytNets, dailyTotals } from "@/lib/stats";
 import { overallCoverage, pickBranchSubject } from "@/lib/smart/mock-plan";
 import { chooseMock } from "@/lib/smart/mock-model";
@@ -288,6 +289,43 @@ export function rankTopics(topics: TopicRow[], daily: DailyRow[], wrongs: WrongR
   }).sort((x, y) => y.priority - x.priority);
 }
 
+/**
+ * Tekrar adaylarını ders bazında adil seçer.
+ *
+ * `rankTopics` sıralaması GLOBAL önceliktir; zayıf konular (skor ~0.75) bitmiş/
+ * orta konuların (~0.65) önüne geçer. Bu yüzden düz bir `slice` ile kesildiğinde,
+ * başlamış konularının TAMAMI öğrenilmiş bir ders (ör. TYT Geometri) haftalarca
+ * tekrar alamıyordu (ölçüm: 72 aday günün 51'inde ilk 8'e giremedi).
+ *
+ * Seçim iki kuralı korur:
+ *   1. En yüksek öncelikli aday HER ZAMAN alınır; kritik/zayıf bir konu ders
+ *      adaleti yüzünden geriye düşmez.
+ *   2. Kalan yerler ders bazında DÖNÜŞÜMLÜ doldurulur; hiçbir ders dilimden
+ *      tamamen dışlanmaz. Dönüşüm `out` öncelik sırasını izler.
+ */
+function selectFairReviews(out: ReviewRec[], limit: number): ReviewRec[] {
+  if (out.length <= limit) return out;
+  const picked: ReviewRec[] = [out[0]];
+  const groups = new Map<string, ReviewRec[]>();
+  for (const r of out.slice(1)) {
+    const key = `${r.exam}|${r.subject}`;
+    const list = groups.get(key);
+    if (list) list.push(r);
+    else groups.set(key, [r]);
+  }
+  for (let more = true; more && picked.length < limit; ) {
+    more = false;
+    for (const list of groups.values()) {
+      const next = list.shift();
+      if (!next) continue;
+      picked.push(next);
+      more = true;
+      if (picked.length >= limit) break;
+    }
+  }
+  return picked;
+}
+
 export function dueReviews(topics: TopicRow[], daily: DailyRow[], today = todayISO()): ReviewRec[] {
   const ranked = rankTopics(topics, daily, [], today);
   const out: ReviewRec[] = [];
@@ -321,7 +359,7 @@ export function dueReviews(topics: TopicRow[], daily: DailyRow[], today = todayI
       due,
     });
   }
-  return out.slice(0, 8);
+  return selectFairReviews(out, 8);
 }
 
 export function buildInsights(
@@ -706,6 +744,37 @@ export function buildDailyPlan(
 } {
   const weekday = new Date(today + "T12:00:00").getDay();
   const sunday = weekday === 0;
+  // Sınav öncesi hafifletme pencereleri (timeline'ın "son iki hafta hafif deneme
+  // ve uyku düzeni" vaadi). 07–13 Haziran (6–12 gün kala): tam denemelere izin
+  // verilir ama günlük yük sınırlanır. 14–18 Haziran (1–5 gün kala): tam deneme
+  // üretilmez, yük daha da kısılır; hafif tekrar ve hedefli soru çözümü kalır.
+  // 19–20 Haziran sınav günleridir (aşağıdaki koruma).
+  const daysToExam = settings.examDate ? daysBetween(today, settings.examDate) : 9999;
+  const taperLight = daysToExam >= 6 && daysToExam <= 12;
+  const taperFinal = daysToExam >= 1 && daysToExam <= 5;
+  // Sınav günleri akademik olarak BOŞTUR. TYT sınavı `settings.examDate`, AYT
+  // sınavı `TARGETS.aytExam`'dir (ikisi de ÖSYM takviminden; sabit tarih
+  // gömülmez). Sınav gününde plan üretilmez: konu, soru, tekrar, yanlış analizi
+  // ve deneme atanmaz. 18 Haziran planı bu kuraldan etkilenmez.
+  const isExamDay =
+    today === settings.examDate || (settings.examDate === TARGETS.tytExam && today === TARGETS.aytExam);
+  if (isExamDay) {
+    const lifeOnly: PlanSlot[] = busyIntervals(settings, weekday).map((b) => ({
+      id: uid(),
+      start: fromMin(b.start),
+      end: fromMin(b.end),
+      exam: "",
+      subject: "",
+      topic: b.label,
+      kind: "Tekrar",
+      targetQ: 0,
+      minutes: b.end - b.start,
+      priority: "düşük",
+      reason: "Korunan yaşam bloğu",
+      life: true,
+    }));
+    return { slots: [], life: lifeOnly, analyzedWrongIds: [], branchMockSubject: null };
+  }
   const pace = planPace(topics, settings, today);
   if (settings.programStart && today < settings.programStart) {
     const lifeOnly: PlanSlot[] = busyIntervals(settings, weekday).map((b) => ({
@@ -732,6 +801,11 @@ export function buildDailyPlan(
   // Dönemsel kapasite eğrisi (330/390/480); varsayılan 240'ı geçersiz kılar.
   let budget = dailyCapacity(today, settings.studyMinutes) + extra;
   if (sunday) budget = Math.max(90, Math.round(budget * 0.5));
+  // Sınav öncesi hafifletme: son iki haftada günlük tavan kısılır (sınav günü
+  // zaten boştur). Amaç yükü azaltmak; yeni konu, tekrar ve soru çözümü
+  // öncelikleri değişmez, yalnızca günlük kapasite tavanı düşer.
+  if (taperLight) budget = Math.min(budget, 330);
+  if (taperFinal) budget = Math.min(budget, 240);
   // Sabit günlük görevlerin (paragraf, problem, yanlış analizi) toplam dakikası.
   let fixedMinutes = 0;
   const slots: PlanSlot[] = [];
@@ -753,8 +827,10 @@ export function buildDailyPlan(
   const tasks: (Omit<PlanSlot, "id" | "start" | "end"> & { tier?: number })[] = [];
 
   // Deneme günü: kullanıcı seçimi + yoğun fazlarda hafta ortası ek deneme.
+  // Son 5 günde (taperFinal) TAM deneme üretilmez; o günler hafif tekrar ve
+  // hedefli soru çözümüne ayrılır.
   const extraMockDay = phase.mockIntensity >= 2 && weekday === 3;
-  const mockDay = (settings.mockWeekdays.includes(weekday) || extraMockDay) && !sunday;
+  const mockDay = (settings.mockWeekdays.includes(weekday) || extraMockDay) && !sunday && !taperFinal;
   // Deneme günü: 165–180 dk'lık tam deneme günün omurgasıdır. Bu bayrak denemenin
   // bitişik yerleşmesini ve o gün yeni konu açılmamasını tetikler.
   let mockFull = false;
@@ -1379,6 +1455,22 @@ export function buildDailyPlan(
 
   // 2. geçiş: tekrarlar, kalan paya sığdığı kadar.
   let reviewMinutes = 0;
+  // Aynı gün aynı derse ikinci "Tekrar" yazılmaz: kıt tekrar kotası ders
+  // çeşitliliğine gider (ölçüm: 05.01.2027'de Tekrar:TYT/Türkçe iki kez).
+  // Eksik kapatma (recovery) türleri bu kısıtın dışındadır; onlar rotasyonludur.
+  const reviewedSubjects = new Set<string>();
+  // Esnek tekrar kotası (P3). `reviewCap`, `splitBudget`'ın yeni konu ve pratik
+  // rezervlerinden sonra tekrara bıraktığı paydır; ama gün içinde bu rezervler
+  // TAM kullanılmazsa artan kapasite boşa gider ve hazır tekrar adayı varken
+  // gün tekrarsız kapanır (ölçüm: 02.2027'de reviewCap=0 ama 105–215 dk boş).
+  // Gerçekten boş kalan kapasite ölçülür; bir tam tekrar slotuna (55 dk) yer
+  // varsa tavan bir slot esner. Yeni konu ve pratik görevleri ÖNCELİKLİ
+  // olduğundan hiçbir koşulda ötelenmez: esneme yalnızca onlar yerleştikten
+  // sonra artan boşluğu kullanır. Boşluk yoksa davranış birebir korunur.
+  if (!sunday) {
+    const committedMinutes = tasks.reduce((a, t) => a + t.minutes, 0);
+    if (budget - committedMinutes >= TOPIC_MINUTES) split.reviewCap += TOPIC_MINUTES;
+  }
   for (const r of reviews) {
     const mins = r.health === "kritik" ? 70 : 55;
     if (tasks.filter((t) => t.kind === "Tekrar").length >= 3) break;
@@ -1390,6 +1482,8 @@ export function buildDailyPlan(
     // devreye girmiyordu (ölçüm: takılı konuya 12 gün üst üste aynı "Tekrar").
     const isRecovery = recoveryKeys.has(`${r.exam}|${r.subject}|${r.topic}`);
     const kind = isRecovery ? recoveryKindFor(r.exam, r.subject, r.topic) : "Tekrar";
+    if (kind === "Tekrar" && reviewedSubjects.has(`${r.exam}|${r.subject}`)) continue;
+    if (kind === "Tekrar") reviewedSubjects.add(`${r.exam}|${r.subject}`);
     tasks.push({
       exam: r.exam,
       subject: r.subject,
@@ -1494,6 +1588,56 @@ export function buildDailyPlan(
       break;
     }
     if (!placed) continue;
+  }
+  // Senaryo A — yeni konu rezervinin KULLANILMAYAN kısmını tekrar kapasitesine
+  // aktarır. Ölçüm "üretilen" değil "YERLEŞEN" anlatımlara göre yapılır: kapasite
+  // veya pencere yüzünden düşen bir anlatım rezervi tüketmiş sayılmaz. Ek
+  // tekrarlar yalnızca yeni konu, pratik ve rutin görevler yerleştikten SONRA
+  // artan gerçek boşluğa konur; bu yüzden hiçbir görevi ötelemez. Rezerv tümüyle
+  // kullanıldıysa (kullanılmayan < 55) davranış birebir korunur.
+  {
+    const placedNewTopicMinutes = slots
+      .filter((s) => s.kind === "Konu anlatımı")
+      .reduce((a, s) => a + s.minutes, 0);
+    const unusedNewReserve = Math.max(0, split.newTopicReserve - placedNewTopicMinutes);
+    if (!sunday && unusedNewReserve >= TOPIC_MINUTES) {
+      const reviewCapLimit = split.reviewCap + unusedNewReserve;
+      const placedReviews = slots.filter((s) => s.kind === "Tekrar");
+      let extraReviewMinutes = placedReviews.reduce((a, s) => a + s.minutes, 0);
+      const placedReviewSubjects = new Set(placedReviews.map((s) => `${s.exam}|${s.subject}`));
+      for (const r of reviews) {
+        if (slots.filter((s) => s.kind === "Tekrar").length >= 3) break;
+        const mins = r.health === "kritik" ? 70 : 55;
+        if (extraReviewMinutes + mins > reviewCapLimit) break;
+        if (slots.some((s) => s.topic === r.topic && s.subject === r.subject)) continue;
+        const isRecovery = recoveryKeys.has(`${r.exam}|${r.subject}|${r.topic}`);
+        const kind = isRecovery ? recoveryKindFor(r.exam, r.subject, r.topic) : "Tekrar";
+        if (kind === "Tekrar" && placedReviewSubjects.has(`${r.exam}|${r.subject}`)) continue;
+        const need = isRecovery && kind === "Yanlış analizi" ? 40 : mins;
+        if (used + need > budget) break;
+        const range = freeRanges().find((rg) => rg.end - rg.start >= need);
+        if (!range) continue;
+        placeAt(
+          {
+            exam: r.exam,
+            subject: r.subject,
+            topic: r.topic,
+            kind,
+            targetQ: isRecovery ? RECOVERY_TARGET[kind] : r.suggestedQ,
+            minutes: need,
+            priority: r.health === "kritik" ? "yüksek" : "orta",
+            reason: isRecovery
+              ? `Eksik kapatma turu: ${kind} (akıllı durum: ${r.health}).`
+              : r.reason,
+            tier: 2,
+          },
+          need,
+          range.start,
+        );
+        extraReviewMinutes += need;
+        if (kind === "Tekrar") placedReviewSubjects.add(`${r.exam}|${r.subject}`);
+      }
+    }
   }
   // Ders geçişlerini azalt: yerleşen görevleri DERS BLOĞU olarak yeniden sırala.
   //

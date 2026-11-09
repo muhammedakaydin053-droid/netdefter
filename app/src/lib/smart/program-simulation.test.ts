@@ -82,6 +82,8 @@ interface Metrics {
 }
 
 const AYT_SUBJECTS = ["Fizik", "Kimya", "Biyoloji", "Matematik", "Geometri"];
+/** Sınav günleri: akademik görev atanmaz (H1). Boş gün sayımından hariçtir. */
+const EXAM_DAYS = new Set(["2027-06-19", "2027-06-20"]);
 /** Kapasite eğrisi (`budget.ts` ile aynı): 330/390/480. */
 const MONTH_CAP: Record<string, number> = {
   "2026-11": 330, "2026-12": 390,
@@ -142,7 +144,8 @@ function runPeriod(opts: { withData: boolean | "both" }): Metrics {
     }
 
     const academic = r.slots.filter((s: any) => s.exam && s.kind !== "Deneme" && s.kind !== "Yanlış analizi");
-    if (academic.length === 0) emptyDays += 1;
+    // Sınav günleri (19–20.06.2027) tasarım gereği boştur; boş gün sayımaz.
+    if (academic.length === 0 && !EXAM_DAYS.has(date)) emptyDays += 1;
     const dayMinutes = r.slots.filter((s: any) => !s.life).reduce((a: number, s: any) => a + s.minutes, 0);
     capUsage.push(dayMinutes);
     if (dayMinutes > MONTH_CAP[date.slice(0, 7)]) overCapacityDays += 1;
@@ -204,7 +207,7 @@ function runPeriod(opts: { withData: boolean | "both" }): Metrics {
       }
     }
 
-    if (recordTyt && new Date(date + "T12:00:00").getDay() === 6 && date >= "2026-11-21") {
+    if (recordTyt && new Date(date + "T12:00:00").getDay() === 6 && date >= "2026-11-21" && !EXAM_DAYS.has(date)) {
       const subj = ["Matematik", "Fizik", "Kimya", "Biyoloji", "Türkçe"][i % 5];
       wrongs = [...wrongs, { id: `w${wrongsCreated++}`, date, exam: "TYT", subject: subj, topic: "Kuvvet ve Hareket", subtopic: "", reason: "kavram", wrong: 2, note: "" }];
       if (date <= "2027-05-01") {

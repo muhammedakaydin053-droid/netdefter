@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import { createServer, type ViteDevServer } from "vite";
 
 let server: ViteDevServer;
-let E: any, S: any, B: any, curriculum: any[], isOngoing: any, RM: any;
+let E: any, S: any, B: any, curriculum: any[], isOngoing: any, RM: any, TARGETS: any;
 
 before(async () => {
   server = await createServer({ server: { middlewareMode: true }, logLevel: "silent" });
@@ -25,6 +25,8 @@ before(async () => {
   isOngoing = (await server.ssrLoadModule("/src/data/sequence.ts")).isOngoingTopic;
   RM = await server.ssrLoadModule("/src/data/roadmap.ts");
   B = await server.ssrLoadModule("/src/lib/smart/budget.ts");
+  // Sınav tarihleri merkezi kaynaktan okunur; test dosyasında ikinci kez sabitlenmez.
+  TARGETS = (await server.ssrLoadModule("/src/data/targets.ts")).TARGETS;
 });
 
 after(async () => {
@@ -1481,5 +1483,66 @@ describe("gerçek uygulama entegrasyonu (10.11.2026 – 16.02.2027)", () => {
     assert.ok((R.kinds["Deneme"] ?? 0) > 0, "deneme üretilmedi");
     assert.equal(R.emptyDays, 0, `${R.emptyDays} boş akademik gün var`);
     assert.ok(R.maxMs < 1000, `tek çağrı yavaş: ${R.maxMs} ms`);
+  });
+});
+
+/**
+ * Sınav günü koruması (H1) — POZİTİF regresyon testleri.
+ *
+ * `program-simulation.test.ts` sınav günlerini yalnızca "boş gün" sayımından
+ * hariç tutar; bu, korumanın gerçekten çalıştığını KANITLAMAZ (koruma kalksa da
+ * test geçerdi). Bu blok doğrudan `buildDailyPlan` çıktısını doğrular.
+ *
+ * Sınav tarihleri merkezi `TARGETS`'tan türetilir; burada ikinci kez sabitlenmez.
+ */
+describe("sınav günü koruması (H1) — pozitif", () => {
+  /** Normal bir günde görev üretildiğini kanıtlar (fixture boş değil). */
+  it("fixture normal bir günde görev üretir (referans)", () => {
+    const { slots } = E.buildDailyPlan(seed(), [], [], [], [], S, [], "2027-05-10", new Set());
+    assert.ok(slots.length > 0, "fixture hiç görev üretmiyor; sınav günü testleri anlamsız olurdu");
+  });
+
+  it("19.06.2027 (TYT sınav günü): slots.length === 0", () => {
+    const { slots } = E.buildDailyPlan(seed(), [], [], [], [], S, [], TARGETS.tytExam, new Set());
+    assert.equal(slots.length, 0, `sınav gününde ${slots.length} görev atandı`);
+    assert.equal(S.examDate, TARGETS.tytExam, "varsayılan examDate TYT sınavına eşit olmalı");
+  });
+
+  it("20.06.2027 (AYT sınav günü): slots.length === 0", () => {
+    const { slots } = E.buildDailyPlan(seed(), [], [], [], [], S, [], TARGETS.aytExam, new Set());
+    assert.equal(slots.length, 0, `AYT sınav gününde ${slots.length} görev atandı`);
+  });
+
+  it("sınav gününde hiçbir görev türü yok (konu/soru/tekrar/deneme/yanlış)", () => {
+    for (const d of [TARGETS.tytExam, TARGETS.aytExam]) {
+      const { slots } = E.buildDailyPlan(seed(), [], [], [], [], S, [], d, new Set());
+      for (const kind of ["Konu anlatımı", "Soru çözümü", "Tekrar", "Deneme", "Yanlış analizi"]) {
+        assert.equal(slots.filter((s: any) => s.kind === kind).length, 0, `${d}: ${kind} atandı`);
+      }
+    }
+  });
+
+  it("18.06.2027 planı korunur: boş değil ve tam deneme atanmaz", () => {
+    const { slots } = E.buildDailyPlan(seed(), [], [], [], [], S, [], "2027-06-18", new Set());
+    assert.ok(slots.length > 0, "18 Haziran yanlışlıkla boşaltıldı");
+    // Son 5 gün (taperFinal) tam deneme üretilmez.
+    assert.equal(slots.filter((s: any) => s.kind === "Deneme").length, 0, "18 Haziran'da deneme atandı");
+    assert.equal(slots.filter((s: any) => s.kind === "Konu anlatımı").length, 0, "18 Haziran'da yeni konu açıldı");
+  });
+
+  it("program başlangıcı öncesi gün akademik görev üretmez", () => {
+    const before = addDays(S.programStart, -1); // 2026-11-09
+    const { slots } = E.buildDailyPlan(seed(), [], [], [], [], S, [], before, new Set());
+    assert.equal(slots.length, 0, `başlangıç öncesi ${slots.length} görev atandı`);
+  });
+
+  it("özel examDate: AYT günü korunmaz, TYT günü korunur", () => {
+    // Merkezi takvimden farklı bir examDate verilirse AYT koruması devre dışı
+    // kalır (tasarım): yalnızca `settings.examDate` korunur.
+    const custom = { ...S, examDate: "2027-06-25" };
+    const ayt = E.buildDailyPlan(seed(), [], [], [], [], custom, [], TARGETS.aytExam, new Set());
+    assert.ok(ayt.slots.length > 0, "özel examDate'te AYT günü yanlışlıkla boşaltıldı");
+    const tyt = E.buildDailyPlan(seed(), [], [], [], [], custom, [], "2027-06-25", new Set());
+    assert.equal(tyt.slots.length, 0, "özel examDate günü korunmadı");
   });
 });

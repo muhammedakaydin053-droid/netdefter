@@ -358,3 +358,103 @@ describe("arşiv birleşimi — importData mevcut arşivi korur", () => {
     assert.equal(S.useAppStore.getState().archivedTopics.some((a: any) => a.id === back.id), false);
   });
 });
+
+/**
+ * Yeni kalıcı alanlar: `analyzedWrongs` ve `branchMockHistory` (v4).
+ *
+ * Bu alanlar yanlış-analizi mükerrerini ve branş denemesi rotasyonunu yönetir.
+ * Yedek export/import ve geri yükleme sırasında kaybolmamalı; eski (alanı
+ * olmayan) yedeklerde ise güvenli varsayılan (boş nesne) uygulanmalı.
+ */
+describe("yeni kalıcı alanlar — yedek round-trip", () => {
+  function dataWithMarks(over: Record<string, unknown> = {}) {
+    return {
+      ...sampleData(),
+      analyzedWrongs: { w1: "2026-11-09", w2: "2026-11-10" },
+      branchMockHistory: { "TYT|Fizik": "2026-11-07", "TYT|Kimya": "2026-11-14" },
+      ...over,
+    };
+  }
+
+  it("(26) dışa aktarma analyzedWrongs/branchMockHistory alanlarını taşır", () => {
+    const d = dataWithMarks();
+    const parsed = B.parseBackup(B.serializeBackup(d));
+    assert.equal(parsed.ok, true);
+    assert.deepEqual(parsed.data.analyzedWrongs, d.analyzedWrongs, "analyzedWrongs kayboldu");
+    assert.deepEqual(parsed.data.branchMockHistory, d.branchMockHistory, "branchMockHistory kayboldu");
+  });
+
+  it("(27) içe aktarma analyzedWrongs/branchMockHistory değerlerini geri yükler", () => {
+    S.useAppStore.setState({ backup: null });
+    S.useAppStore.getState().importData(dataWithMarks());
+    const s = S.useAppStore.getState();
+    assert.deepEqual(s.analyzedWrongs, { w1: "2026-11-09", w2: "2026-11-10" });
+    assert.deepEqual(s.branchMockHistory, { "TYT|Fizik": "2026-11-07", "TYT|Kimya": "2026-11-14" });
+  });
+
+  it("(28) eski yedekte alanlar yoksa içe aktarma bozulmaz, boş nesne olur", () => {
+    // Alanları olmayan eski format: mevcut işaretler taşınmaz (güvenli varsayılan).
+    S.useAppStore.setState({ backup: null, analyzedWrongs: { eski: "2026-01-01" }, branchMockHistory: { "TYT|Eski": "2026-01-01" } });
+    const { analyzedWrongs: _a, branchMockHistory: _b, ...legacy } = dataWithMarks() as any;
+    S.useAppStore.getState().importData(legacy);
+    const s = S.useAppStore.getState();
+    assert.deepEqual(s.analyzedWrongs, {}, "eski işaretler sızdı");
+    assert.deepEqual(s.branchMockHistory, {}, "eski işaretler sızdı");
+  });
+
+  it("(29) parseBackup bozuk (dizi/nesne olmayan) değerleri güvenle eler", () => {
+    const r = B.parseBackup(envelope({
+      topics: sampleData().topics,
+      analyzedWrongs: { w1: "2026-11-09", w2: 123, w3: null }, // yalnızca string tutulmalı
+      branchMockHistory: "metin", // nesne değil -> {}
+    }));
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.data.analyzedWrongs, { w1: "2026-11-09" }, "yalnızca string değerler tutulmalı");
+    assert.deepEqual(r.data.branchMockHistory, {}, "nesne olmayan değer boş nesne olmalı");
+  });
+
+  it("(30) resetAll işaretleri temizler, restoreBackup geri getirir", () => {
+    S.useAppStore.setState({ topics: S.seedTopics(), archivedTopics: [], backup: null });
+    S.useAppStore.getState().importData(dataWithMarks());
+    S.useAppStore.getState().markWrongsAnalyzed(["w9"], "2026-11-20");
+    S.useAppStore.getState().markBranchMock("Biyoloji", "2026-11-21");
+
+    S.useAppStore.getState().resetAll(); // yedek alınır, işaretler temizlenir
+    assert.deepEqual(S.useAppStore.getState().analyzedWrongs, {}, "resetAll işaretleri temizlemedi");
+    assert.deepEqual(S.useAppStore.getState().branchMockHistory, {}, "resetAll işaretleri temizlemedi");
+
+    S.useAppStore.getState().restoreBackup();
+    const s = S.useAppStore.getState();
+    assert.deepEqual(s.analyzedWrongs, { w1: "2026-11-09", w2: "2026-11-10", w9: "2026-11-20" }, "geri yükleme işaretleri kaybetti");
+    assert.equal(s.branchMockHistory["TYT|Fizik"], "2026-11-07");
+    assert.equal(s.branchMockHistory["TYT|Biyoloji"], "2026-11-21");
+  });
+
+  it("(31) markWrongsAnalyzed yinelenen id'lerde son tarihi tutar, çoğaltmaz", () => {
+    S.useAppStore.setState({ analyzedWrongs: {}, branchMockHistory: {} });
+    S.useAppStore.getState().markWrongsAnalyzed(["w1", "w1", "w2"], "2026-11-09");
+    S.useAppStore.getState().markWrongsAnalyzed(["w1"], "2026-11-15");
+    const a = S.useAppStore.getState().analyzedWrongs;
+    assert.equal(Object.keys(a).length, 2, "yinelenen kayıt oluştu");
+    assert.equal(a.w1, "2026-11-15", "son tarih kazanmadı");
+    assert.equal(a.w2, "2026-11-09");
+  });
+
+  it("(32) markBranchMock aynı dersi ikinci kez işaretlerse tarih güncellenir, kopya oluşmaz", () => {
+    S.useAppStore.setState({ analyzedWrongs: {}, branchMockHistory: {} });
+    S.useAppStore.getState().markBranchMock("Fizik", "2026-11-07");
+    S.useAppStore.getState().markBranchMock("Fizik", "2026-11-21");
+    const b = S.useAppStore.getState().branchMockHistory;
+    assert.equal(Object.keys(b).length, 1, "kopya kayıt oluştu");
+    assert.equal(b["TYT|Fizik"], "2026-11-21", "son tarih kazanmadı");
+  });
+
+  it("(33) tekrarlı içe aktarma işaretleri çoğaltmaz", () => {
+    S.useAppStore.setState({ backup: null });
+    S.useAppStore.getState().importData(dataWithMarks());
+    S.useAppStore.getState().importData(dataWithMarks());
+    S.useAppStore.getState().importData(dataWithMarks());
+    assert.equal(Object.keys(S.useAppStore.getState().analyzedWrongs).length, 2, "işaretler çoğaldı");
+    assert.equal(Object.keys(S.useAppStore.getState().branchMockHistory).length, 2, "işaretler çoğaldı");
+  });
+});
