@@ -160,7 +160,7 @@ function snapshot(s: AppState): DataSnapshot {
  * Kayıtlı (persist) ayarların sürümü. Bir kayıtta bu sürümden eski bir `version`
  * görülürse `migratePersistedState` çalışır.
  */
-export const PERSIST_VERSION = 3;
+export const PERSIST_VERSION = 4;
 
 /** v0 varsayılanı: takvim kaydırmasından önceki program başlangıcı. */
 export const LEGACY_PROGRAM_START = "2026-11-01";
@@ -168,16 +168,18 @@ export const LEGACY_PROGRAM_START = "2026-11-01";
 export const V1_PROGRAM_START = "2026-11-04";
 /** v2 varsayılanı (artık eski): 05.11.2026 program başlangıcı. */
 export const V2_PROGRAM_START = "2026-11-05";
-/** Güncel varsayılan: 09.11.2026 Pazartesi program başlangıcı. */
-export const MIGRATED_PROGRAM_START = "2026-11-09";
+/** v3 varsayılanı (artık eski): 09.11.2026 Pazartesi program başlangıcı. */
+export const V3_PROGRAM_START = "2026-11-09";
+/** Güncel varsayılan: 10.11.2026 Salı program başlangıcı. */
+export const MIGRATED_PROGRAM_START = "2026-11-10";
 
 /**
  * Eski kayıtlı durumu güncel şemaya taşır — SAF ve tek seferlik.
  *
  * Sürümlü zincir, `programStart` TAM OLARAK eski bir varsayılana eşitse
  * ilerletilir: v0 (`2026-11-01`) → v1 (`2026-11-04`) → v2 (`2026-11-05`)
- * → v3 (`2026-11-09`). Kullanıcı başka bir tarihe elle ayarladıysa
- * DOKUNULMAZ; aksi hâlde kişisel plan bozulurdu.
+ * → v3 (`2026-11-09`) → v4 (`2026-11-10`). Kullanıcı başka bir tarihe elle
+ * ayarladıysa DOKUNULMAZ; aksi hâlde kişisel plan bozulurdu.
  *
  * Girdi mutasyona uğratılmaz (sığ kopya alınır); `topics`, `wrongs`, `tytExams`,
  * `aytExams`, `daily`, `archivedTopics`, `carry` ve diğer ayar alanları aynen
@@ -199,8 +201,10 @@ export function migratePersistedState(persisted: unknown, fromVersion: number): 
     if (settings.programStart === LEGACY_PROGRAM_START) settings.programStart = V1_PROGRAM_START;
     // v1 -> v2: şartnameyle hizalama (05.11.2026).
     if (settings.programStart === V1_PROGRAM_START) settings.programStart = V2_PROGRAM_START;
-    // v2 -> v3: yeni program başlangıcı (09.11.2026 Pazartesi).
-    if (settings.programStart === V2_PROGRAM_START) settings.programStart = MIGRATED_PROGRAM_START;
+    // v2 -> v3: önceki program başlangıcı (09.11.2026 Pazartesi).
+    if (settings.programStart === V2_PROGRAM_START) settings.programStart = V3_PROGRAM_START;
+    // v3 -> v4: yeni program başlangıcı (10.11.2026 Salı).
+    if (settings.programStart === V3_PROGRAM_START) settings.programStart = MIGRATED_PROGRAM_START;
     p.settings = settings;
   }
   return p;

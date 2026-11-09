@@ -1363,15 +1363,15 @@ describe("çoklu senaryo simülasyonu", () => {
  * GERÇEK UYGULAMA ENTEGRASYONU — dönem simülasyonu.
  *
  * `runApp` bloğu Mod B donmasını yalnızca ilk 30–120 günde doğruluyor. Bu blok
- * kullanıcının bildirdiği tam aralığı (09.11.2026 – 16.02.2027) gerçek ekran
+ * kullanıcının bildirdiği tam aralığı (10.11.2026 – 16.02.2027) gerçek ekran
  * çağrısıyla (9. argüman YOK) işletir ve şu sözleşmeleri kilitler:
  *   - 14.11.2026 sonrasında yeni konu üretimi devam eder,
- *   - AYT Fizik 01.12.2026'da açılır, diğer AYT dersleri kendi kapılarında açılır,
+ *   - AYT Fizik aralık başında açılır, diğer AYT dersleri kendi kapılarında açılır,
  *   - 184 öğretilebilir konu öğrenilme koşullarıyla ilerler,
  *   - aynı anlatım görevi tekrar üretilmez,
  *   - pratik / tekrar / eksik kapatma görevleri üretilir.
  */
-describe("gerçek uygulama entegrasyonu (09.11.2026 – 16.02.2027)", () => {
+describe("gerçek uygulama entegrasyonu (10.11.2026 – 16.02.2027)", () => {
   const END = "2027-02-16";
 
   /** Gerçek çağrı biçimiyle dönemi işletir; günlük kayıtları toplar. */
