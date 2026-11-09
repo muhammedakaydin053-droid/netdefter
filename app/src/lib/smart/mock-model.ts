@@ -58,48 +58,77 @@ export interface MockChoice {
 }
 
 /**
+ * Planlanan tam deneme sınavı — TAKVİME bağlı, sonuç kaydından BAĞIMSIZ.
+ *
+ * Tam deneme dağılımının TEMELİ budur. Kullanıcının hangi sınavın sonucunu
+ * girip hangisini girmediği bu dağılımı değiştirmez; sonuç verileri yalnızca
+ * hazırbulunuşluk (kapı/kapsam) ve zayıflık kararlarını etkiler.
+ *
+ * TYT önceliği iki düzeyde korunur:
+ *  - TYT ilk turu sürerken (veya TYT sınavına ≤ 60 gün kala) 2:1 dönüşüm
+ *    (TYT, TYT, AYT): çekirdek sınav daha sık ölçülür.
+ *  - İlk tur bittikten sonra ve son iki ayda 1:1 (TYT, AYT): her iki sınav da
+ *    düzenli tekrar gerektirir.
+ *
+ * `rotationIndex` deneme FIRSATI sayacıdır (program başından bugüne kaç deneme
+ * günü geçtiği). Böylece art arda gelen deneme günleri farklı sınav türü alır ve
+ * iki sınav da açlıkta kalmaz. Sabit bir oran DEĞİL, kadanslı bir dönüşümdür.
+ */
+export function plannedMockExam(
+  rotationIndex: number,
+  opts: { tytRound1Done: boolean; daysToTytExam: number },
+): "TYT" | "AYT" {
+  // Son iki ayda (≤ 60 gün) veya TYT ilk turu bitince 1:1'e geç.
+  const balanced = opts.tytRound1Done || opts.daysToTytExam <= 60;
+  const cycle = balanced ? 2 : 3;
+  const idx = ((rotationIndex % cycle) + cycle) % cycle;
+  // 3'lü çevrimde üçüncü slot AYT: TYT, TYT, AYT (TYT önceliği).
+  if (cycle === 3) return idx === 2 ? "AYT" : "TYT";
+  // 2'li çevrimde dönüşümlü: TYT, AYT.
+  return idx === 0 ? "TYT" : "AYT";
+}
+
+/**
  * Deneme günü için tür seçimi.
  *
- * Sıra ve DENGE önemli:
- *  1. Tam denemeler yalnızca deneme gününde ve zamanı geldiğinde (`overdueDays`
- *     ≥ aralık) seçilir. TYT ve AYT AYNI gün için hazırsa EN ÇOK GECİKMİŞ olan
- *     kazanır; eşitlikte TYT seçilir (çekirdek korunur). Bu denge olmadan AYT
- *     hazır olduğu anda bütün deneme günlerini AYT alıyor, TYT tam denemesi
- *     hiç yapılmıyordu (ölçüm: 140 günde 17 AYT, 0 TYT).
- *  2. Tam deneme zamanı gelmediyse ama deneme günüyse branş denemesi konur
- *     (gün denemesiz geçmez, en zayıf ders ölçülür).
- *  3. Branş için bile kapsam yetmiyorsa mini deneme.
- *  4. Hiçbiri uygun değilse deneme konmaz.
+ * İki karar AYRI verilir:
+ *  1. Bu deneme günü TAM deneme günü mü (`fullMockDue`)? Bu TAKVİME bağlıdır
+ *     (faz yoğunluğu + deneme günü sayacı), sonuç kaydına değil.
+ *  2. Tam deneme günüyse hangi sınav (TYT/AYT)? Bu da TAKVİM dönüşümüyle
+ *     belirlenir (`plannedMockExam`), sonuç kaydına göre değil.
+ *
+ * Böylece "yalnız TYT sonucu girilince TYT denemeleri bastırılır" sorunu
+ * giderilir: kayıt girilse de girilmese de temel TYT–AYT dağılımı aynı kalır.
+ * Kayıt verileri yalnızca HAZIRBULUNUŞLUĞU (kapı/kapsam → `tytReady`/`aytReady`)
+ * ve zayıflık kararlarını (branş dersi seçimi) etkiler.
+ *
+ * Sıra:
+ *  1. Tam deneme günü ve en az bir sınav hazırsa → takvim dönüşümüne göre tam.
+ *  2. Aksi hâlde branş (kapsamı ≥ %50 en uygun ders) veya mini (kapsam ≥ %30).
+ *     Deneme günü boş geçmez; branş/mini günleri korunur.
+ *  3. Hiçbiri uygun değilse deneme konmaz.
  *
  * `isMockDay` false ise her zaman null: tam denemeler yalnızca deneme gününde
  * yerleşir (bitişik blok ve o gün yeni konu açılmaması buna bağlıdır).
  */
 export function chooseMock(opts: {
   isMockDay: boolean;
+  /** Bu gün tam deneme günü mü (takvim kadansı)? */
+  fullMockDue: boolean;
   tytReady: boolean;
-  /** Son TYT tam denemesinden bu yana gün; hiç yoksa Infinity. */
-  tytOverdueDays: number;
-  tytInterval: number;
   aytReady: boolean;
-  /** Son AYT tam denemesinden bu yana gün; hiç yoksa Infinity. */
-  aytOverdueDays: number;
-  aytInterval: number;
   /** Kapsamı ≥ %50 olan derslerin EN ZAYIFI; yoksa null. */
   branchSubject: string | null;
   /** Sınav geneli kapsam (0–1). */
   overallCoverage: number;
-  /**
-   * Deneme takvimi ilerleme sayacı (program başından beri geçen hafta). Hiç
-   * deneme kaydı yoksa TYT/AYT tam denemeleri bu sayaçla DÖNÜŞÜMLÜ seçilir;
-   * aksi hâlde iki taraf da "hiç yapılmadı" (Infinity) olduğundan denge hep
-   * TYT'ye kayıp AYT açlıkta kalıyordu.
-   */
-  tick?: number;
+  /** Deneme fırsatı sayacı (program başından bugüne geçen deneme günü sayısı). */
+  rotationIndex: number;
+  /** TYT sınavına kalan gün. */
+  daysToTytExam: number;
+  /** TYT ilk turu bitti mi? Bitince tam deneme dengesi 1:1'e kayar. */
+  tytRound1Done: boolean;
 }): MockChoice | null {
   if (!opts.isMockDay) return null;
-  const tytDue = opts.tytReady && opts.tytOverdueDays >= opts.tytInterval;
-  const aytDue = opts.aytReady && opts.aytOverdueDays >= opts.aytInterval;
-  const tick = opts.tick ?? 0;
 
   const tytFull: MockChoice = {
     type: "tam",
@@ -116,19 +145,22 @@ export function chooseMock(opts: {
     ...FULL_AYT_SPEC,
   };
 
-  if (tytDue && aytDue) {
-    const tytExcess = opts.tytOverdueDays - opts.tytInterval;
-    const aytExcess = opts.aytOverdueDays - opts.aytInterval;
-    // Hiç kayıt yoksa (iki taraf da Infinity) veya gecikmeler eşitse dönüşümlü
-    // seç: TYT ve AYT denemeleri almaşık gider, hiçbiri açlıkta kalmaz.
-    if (!Number.isFinite(tytExcess) && !Number.isFinite(aytExcess)) {
-      return tick % 2 === 0 ? tytFull : aytFull;
-    }
-    if (tytExcess === aytExcess) return tick % 2 === 0 ? tytFull : aytFull;
-    return aytExcess > tytExcess ? aytFull : tytFull;
+  if (opts.fullMockDue) {
+    // Tam deneme sınavı: takvim dönüşümü (sonuç kaydından bağımsız).
+    const exam: "TYT" | "AYT" | null =
+      opts.tytReady && opts.aytReady
+        ? plannedMockExam(opts.rotationIndex, {
+            tytRound1Done: opts.tytRound1Done,
+            daysToTytExam: opts.daysToTytExam,
+          })
+        : opts.tytReady
+          ? "TYT"
+          : opts.aytReady
+            ? "AYT"
+            : null;
+    if (exam === "TYT") return tytFull;
+    if (exam === "AYT") return aytFull;
   }
-  if (aytDue) return aytFull;
-  if (tytDue) return tytFull;
 
   if (opts.branchSubject) {
     return {

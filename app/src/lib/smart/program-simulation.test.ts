@@ -65,15 +65,30 @@ interface Metrics {
   remaining: { TYT: number; AYT: number };
   kinds: Record<string, number>;
   mockType: Record<string, number>;
+  fullByExam: { TYT: number; AYT: number };
   branchBySubject: Record<string, number>;
   emptyDays: number;
+  overCapacityDays: number;
   avgCapacity: number;
   wrongsCreated: number;
   wrongsScheduled: number;
   wrongsAnalyzed: number;
+  /** AYT dersi → ilk/son anlatım tarihi ve en uzun anlatım arası (gün). */
+  aytLecture: Record<string, { first: string; last: string; maxGap: number; gapAt: string }>;
+  /** Kapı açılış tarihinde ön koşulu tamamlanmış mı (ders → bool). */
+  gatePrereqReady: Record<string, boolean>;
 }
 
-function runPeriod(opts: { withData: boolean }): Metrics {
+const AYT_SUBJECTS = ["Fizik", "Kimya", "Biyoloji", "Matematik", "Geometri"];
+/** Kapasite eğrisi (`budget.ts` ile aynı): 330/390/480. */
+const MONTH_CAP: Record<string, number> = {
+  "2026-11": 330, "2026-12": 390,
+  "2027-01": 480, "2027-02": 480, "2027-03": 480, "2027-04": 480, "2027-05": 480, "2027-06": 480,
+};
+
+function runPeriod(opts: { withData: boolean | "both" }): Metrics {
+  const recordTyt = opts.withData === true || opts.withData === "both";
+  const recordAyt = opts.withData === "both";
   let topics = seed();
   let daily: any[] = [];
   let wrongs: any[] = [];
@@ -85,10 +100,14 @@ function runPeriod(opts: { withData: boolean }): Metrics {
   const gateOpen: Record<string, string> = {};
   const kinds: Record<string, number> = {};
   const mockType = { tam: 0, brans: 0, mini: 0 } as Record<string, number>;
+  const fullByExam = { TYT: 0, AYT: 0 };
   const branchBySubject: Record<string, number> = {};
   const capUsage: number[] = [];
   const scheduledWrongIds = new Set<string>();
+  const lectureDates: Record<string, string[]> = {};
+  const gatePrereqReady: Record<string, boolean> = {};
   let emptyDays = 0;
+  let overCapacityDays = 0;
   let wrongsCreated = 0;
   let lastTYT: string | null = null;
   let lastAYT: string | null = null;
@@ -121,13 +140,38 @@ function runPeriod(opts: { withData: boolean }): Metrics {
 
     const academic = r.slots.filter((s: any) => s.exam && s.kind !== "Deneme" && s.kind !== "Yanlış analizi");
     if (academic.length === 0) emptyDays += 1;
-    capUsage.push(r.slots.filter((s: any) => !s.life).reduce((a: number, s: any) => a + s.minutes, 0));
+    const dayMinutes = r.slots.filter((s: any) => !s.life).reduce((a: number, s: any) => a + s.minutes, 0);
+    capUsage.push(dayMinutes);
+    if (dayMinutes > MONTH_CAP[date.slice(0, 7)]) overCapacityDays += 1;
 
     for (const sl of r.slots) {
       kinds[sl.kind] = (kinds[sl.kind] ?? 0) + 1;
-      if (sl.kind === "Deneme") mockType[classifyMock(sl)] += 1;
+      if (sl.kind === "Deneme") {
+        mockType[classifyMock(sl)] += 1;
+        if (classifyMock(sl) === "tam") fullByExam[sl.exam as "TYT" | "AYT"] += 1;
+      }
+      if (sl.exam === "AYT" && sl.kind === "Konu anlatımı") {
+        (lectureDates[sl.subject] ??= []).push(date);
+      }
       if (sl.exam === "AYT" && sl.kind === "Konu anlatımı" && GATE_SUBJECTS.includes(sl.subject) && !gateOpen[sl.subject]) {
         gateOpen[sl.subject] = date;
+        // Kapı açılırken ön koşul gerçekten tamamlanmış mı? Öğrenilmiş sayılan
+        // (Bitti + 15 soru + %70) konulara bakılır; aksi hâlde kapı erken açılmış.
+        const rows = topics.filter(
+          (t: any) => t.exam === "TYT" && t.subject === sl.subject,
+        );
+        const gateNames: Record<string, string[]> = {
+          Matematik: ["Temel Kavramlar", "Sayı Basamakları", "Bölme ve Bölünebilme", "EBOB – EKOK", "Rasyonel Sayılar", "Basit Eşitsizlikler", "Mutlak Değer", "Üslü Sayılar", "Köklü Sayılar", "Çarpanlara Ayırma", "Oran – Orantı", "Denklem Çözme"],
+          Fizik: ["Fizik Bilimine Giriş", "Madde ve Özellikleri", "Hareket ve Kuvvet", "İş, Güç ve Enerji"],
+          Kimya: ["Kimya Bilimi", "Atom ve Periyodik Sistem", "Kimyasal Türler Arası Etkileşimler", "Kimyanın Temel Kanunları", "Mol ve Kimyasal Hesaplamalar"],
+        };
+        const names = gateNames[sl.subject];
+        if (names) {
+          gatePrereqReady[sl.subject] = names.every((name) => {
+            const rows2 = rows.filter((t: any) => t.topic === name);
+            return rows2.length > 0 && rows2.every((t: any) => t.status === "Bitti" && (t.total ?? 0) >= 15 && (t.correct ?? 0) / (t.total ?? 1) >= 0.7);
+          });
+        }
       }
     }
 
@@ -153,11 +197,18 @@ function runPeriod(opts: { withData: boolean }): Metrics {
       }
     }
 
-    if (opts.withData && new Date(date + "T12:00:00").getDay() === 6 && date >= "2026-11-21") {
+    if (recordTyt && new Date(date + "T12:00:00").getDay() === 6 && date >= "2026-11-21") {
       const subj = ["Matematik", "Fizik", "Kimya", "Biyoloji", "Türkçe"][i % 5];
       wrongs = [...wrongs, { id: `w${wrongsCreated++}`, date, exam: "TYT", subject: subj, topic: "Kuvvet ve Hareket", subtopic: "", reason: "kavram", wrong: 2, note: "" }];
       if (date <= "2027-05-01") {
         tytExams = [...tytExams, { id: `t${i}`, date, name: "T", turD: 20, turY: 5, matD: 18, matY: 7, sosD: 15, sosY: 5, fenD: 12, fenY: 8, note: "" }];
+      }
+    }
+    // "both" senaryosunda planlanan AYT tam denemesi sonucu da girilir.
+    if (recordAyt) {
+      const aytMock = r.slots.find((s: any) => s.kind === "Deneme" && s.exam === "AYT");
+      if (aytMock) {
+        aytExams.push({ id: `a${i}`, date, name: "A", matD: 12, matY: 6, fizD: 8, fizY: 4, kimD: 7, kimY: 3, bioD: 8, bioY: 2, note: "" });
       }
     }
   }
@@ -176,18 +227,40 @@ function runPeriod(opts: { withData: boolean }): Metrics {
     else aytLeft += 1;
   }
 
+  const aytLecture: Record<string, { first: string; last: string; maxGap: number; gapAt: string }> = {};
+  for (const subject of AYT_SUBJECTS) {
+    const dates = [...new Set(lectureDates[subject] ?? [])].sort();
+    if (!dates.length) continue;
+    let maxGap = 0;
+    let gapAt = "";
+    for (let j = 1; j < dates.length; j++) {
+      const gap = Math.round(
+        (Date.parse(dates[j] + "T12:00:00Z") - Date.parse(dates[j - 1] + "T12:00:00Z")) / DAY,
+      );
+      if (gap > maxGap) {
+        maxGap = gap;
+        gapAt = `${dates[j - 1]}→${dates[j]}`;
+      }
+    }
+    aytLecture[subject] = { first: dates[0], last: dates[dates.length - 1], maxGap, gapAt };
+  }
+
   return {
     gateOpen,
     lastLecture: { TYT: lastTYT, AYT: lastAYT },
     remaining: { TYT: tytLeft, AYT: aytLeft },
     kinds,
     mockType,
+    fullByExam,
     branchBySubject,
     emptyDays,
+    overCapacityDays,
     avgCapacity: Math.round(capUsage.reduce((a, b) => a + b, 0) / capUsage.length),
     wrongsCreated: wrongs.length,
     wrongsScheduled: scheduledWrongIds.size,
     wrongsAnalyzed: Object.keys(analyzedWrongs).length,
+    aytLecture,
+    gatePrereqReady,
   };
 }
 
@@ -245,8 +318,163 @@ describe("tam dönem simülasyonu (10.11.2026 – 20.06.2027)", () => {
 
   it("rapor — kapı açılışları ve tur bitişleri (bilgi amaçlı)", () => {
     // Bu test sayıları doğrulamaz; rapor için konsola yazar.
-    console.log("SENARYO 1:", JSON.stringify({ gate: A.gateOpen, last: A.lastLecture, mock: A.mockType, kinds: A.kinds, cap: A.avgCapacity }));
-    console.log("SENARYO 2:", JSON.stringify({ gate: B.gateOpen, last: B.lastLecture, mock: B.mockType, kinds: B.kinds, branch: B.branchBySubject, cap: B.avgCapacity }));
+    console.log("SENARYO 1:", JSON.stringify({ gate: A.gateOpen, last: A.lastLecture, mock: A.mockType, full: A.fullByExam, kinds: A.kinds, cap: A.avgCapacity }));
+    console.log("SENARYO 2:", JSON.stringify({ gate: B.gateOpen, last: B.lastLecture, mock: B.mockType, full: B.fullByExam, kinds: B.kinds, branch: B.branchBySubject, cap: B.avgCapacity }));
+    assert.ok(true);
+  });
+});
+
+describe("AYT ders devamlılığı (maksimum bekleme)", () => {
+  let A: Metrics;
+  let B: Metrics;
+  before(() => {
+    A = runPeriod({ withData: false });
+    B = runPeriod({ withData: true });
+  });
+
+  // Eşik: kapı açıldıktan sonra bir AYT dersi en fazla bu kadar gün yeni konu
+  // anlatımı almadan bekleyebilir. Motor `AYT_MAX_WAIT_DAYS = 10` kullanır;
+  // gün döngüsü nedeniyle gözlenen boşluk birkaç gün daha büyük olabilir.
+  const MAX_GAP = 14;
+
+  it("AYT Fizik 46 gün beklemez; maksimum anlatım arası sınırda kalır", () => {
+    for (const [label, m] of [["senaryo 1", A], ["senaryo 2", B]] as const) {
+      const f = m.aytLecture.Fizik;
+      assert.ok(f, `${label}: AYT Fizik anlatımı yok`);
+      assert.ok(f.maxGap <= MAX_GAP, `${label}: AYT Fizik ${f.maxGap} gün bekledi (${f.gapAt})`);
+      assert.ok(f.maxGap < 46, `${label}: AYT Fizik eski 46 günlük boşluğa döndü (${f.gapAt})`);
+    }
+  });
+
+  it("kapısı açık ve tamamlanmamış tüm AYT dersleri maksimum beklemeye uyar", () => {
+    for (const [label, m] of [["senaryo 1", A], ["senaryo 2", B]] as const) {
+      for (const subject of AYT_SUBJECTS) {
+        const s = m.aytLecture[subject];
+        assert.ok(s, `${label}: AYT ${subject} anlatımı yok`);
+        assert.ok(
+          s.maxGap <= MAX_GAP,
+          `${label}: AYT ${subject} ${s.maxGap} gün bekledi (${s.gapAt})`,
+        );
+      }
+    }
+  });
+
+  it("kapısı açılmamış dersler erkenden başlamaz", () => {
+    for (const [label, m] of [["senaryo 1", A], ["senaryo 2", B]] as const) {
+      const g = m.gateOpen;
+      assert.ok(g.Fizik && g.Kimya && g.Matematik, `${label}: kapı açılışları eksik`);
+      // Fizik kapısı en erken açılan AYT dersidir; ondan önce hiçbir AYT dersi
+      // anlatılmamış olmalı (TYT önceliği).
+      for (const subject of AYT_SUBJECTS) {
+        const first = m.aytLecture[subject]?.first;
+        if (!first) continue;
+        assert.ok(
+          first >= g.Fizik,
+          `${label}: AYT ${subject} ilk anlatımı ${first}, ilk kapı ${g.Fizik}'den önce`,
+        );
+      }
+      assert.ok(g.Fizik < g.Kimya, `${label}: Fizik ${g.Fizik} >= Kimya ${g.Kimya}`);
+      assert.ok(g.Kimya < g.Matematik, `${label}: Kimya ${g.Kimya} >= Matematik ${g.Matematik}`);
+    }
+  });
+
+  it("kapı açılırken ön koşul konuları gerçekten öğrenilmiş olur", () => {
+    for (const [label, m] of [["senaryo 1", A], ["senaryo 2", B]] as const) {
+      for (const subject of ["Fizik", "Kimya", "Matematik"]) {
+        assert.equal(
+          m.gatePrereqReady[subject],
+          true,
+          `${label}: AYT ${subject} kapısı ön koşulu tamamlanmadan açıldı`,
+        );
+      }
+    }
+  });
+
+  it("tamamlanan dersler yeniden anlatılmaz (her konu bir kez anlatılır)", () => {
+    for (const [label, m] of [["senaryo 1", A], ["senaryo 2", B]] as const) {
+      assert.equal(
+        m.kinds["Konu anlatımı"],
+        184,
+        `${label}: konu anlatımı sayısı 184 değil (${m.kinds["Konu anlatımı"]}) — tekrar anlatım olabilir`,
+      );
+    }
+  });
+
+  it("TYT ilerlemesi bozulmaz (hedefe yetişir, AYT'den önce biter)", () => {
+    for (const [label, m] of [["senaryo 1", A], ["senaryo 2", B]] as const) {
+      assert.ok(
+        m.lastLecture.TYT! <= "2027-02-08",
+        `${label}: TYT ilk tur ${m.lastLecture.TYT} (hedef 08.02.2027)`,
+      );
+      assert.equal(m.remaining.TYT, 0, `${label}: TYT'de ${m.remaining.TYT} konu kaldı`);
+      assert.ok(
+        m.lastLecture.AYT! >= m.lastLecture.TYT!,
+        `${label}: AYT TYT'den önce bitti`,
+      );
+    }
+  });
+
+  it("kapasite aşılmaz, boş akademik gün olmaz", () => {
+    for (const [label, m] of [["senaryo 1", A], ["senaryo 2", B]] as const) {
+      assert.equal(m.overCapacityDays, 0, `${label}: ${m.overCapacityDays} günde kapasite aşıldı`);
+      assert.equal(m.emptyDays, 0, `${label}: ${m.emptyDays} boş akademik gün`);
+    }
+  });
+});
+
+describe("TYT–AYT tam deneme dengesi (sonuç kaydından bağımsız)", () => {
+  // Üç senaryo AYNI dönem ve temel ayarlarla koşulur; tek değişken hangi sınavın
+  // sonucunun girildiğidir. Temel TYT–AYT tam deneme dağılımı bu değişkene göre
+  // tersine dönmemelidir.
+  let noResult: Metrics;
+  let onlyTyt: Metrics;
+  let both: Metrics;
+  before(() => {
+    noResult = runPeriod({ withData: false });
+    onlyTyt = runPeriod({ withData: true });
+    both = runPeriod({ withData: "both" } as never);
+  });
+
+  it("üç senaryoda da TYT tam denemesi AYT'den fazladır (TYT önceliği)", () => {
+    for (const [label, m] of [["sonuç yok", noResult], ["yalnız TYT", onlyTyt], ["TYT+AYT", both]] as const) {
+      assert.ok(
+        m.fullByExam.TYT > m.fullByExam.AYT,
+        `${label}: TYT ${m.fullByExam.TYT} <= AYT ${m.fullByExam.AYT} (TYT önceliği bozuldu)`,
+      );
+    }
+  });
+
+  it("sonuç kaydı deneme dağılımını tersine çevirmez", () => {
+    // TYT/AYT oranı senaryolar arasında dar bir bantta kalmalı (yaklaşık 2:1).
+    const ratio = (m: Metrics) => m.fullByExam.TYT / m.fullByExam.AYT;
+    const r1 = ratio(noResult);
+    const r2 = ratio(onlyTyt);
+    const r3 = ratio(both);
+    for (const [label, r] of [["sonuç yok", r1], ["yalnız TYT", r2], ["TYT+AYT", r3]] as const) {
+      assert.ok(r >= 1.5 && r <= 3.0, `${label}: TYT/AYT oranı ${r.toFixed(2)} beklenen 1.5–3.0 dışında`);
+    }
+    assert.ok(
+      Math.max(r1, r2, r3) / Math.min(r1, r2, r3) <= 1.5,
+      `oran senaryolar arası savruluyor: ${r1.toFixed(2)}, ${r2.toFixed(2)}, ${r3.toFixed(2)}`,
+    );
+  });
+
+  it("hiçbir senaryoda AYT tam denemesi bastırılmaz", () => {
+    for (const [label, m] of [["sonuç yok", noResult], ["yalnız TYT", onlyTyt], ["TYT+AYT", both]] as const) {
+      assert.ok(m.fullByExam.AYT >= 5, `${label}: AYT tam denemesi çok az (${m.fullByExam.AYT})`);
+      assert.ok(m.fullByExam.TYT >= 5, `${label}: TYT tam denemesi çok az (${m.fullByExam.TYT})`);
+    }
+  });
+
+  it("rapor — üç senaryonun tam deneme sayıları (bilgi amaçlı)", () => {
+    console.log(
+      "DENEME DAĞILIMI:",
+      JSON.stringify({
+        sonucYok: noResult.fullByExam,
+        yalnizTyt: onlyTyt.fullByExam,
+        tytAyt: both.fullByExam,
+      }),
+    );
     assert.ok(true);
   });
 });

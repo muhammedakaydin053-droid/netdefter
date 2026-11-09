@@ -8,18 +8,19 @@ import {
   chooseMock,
   fullMockSpec,
   mockSpec,
+  plannedMockExam,
 } from "./mock-model.ts";
 
 const base = {
   isMockDay: true,
+  fullMockDue: true,
   tytReady: false,
-  tytOverdueDays: Infinity,
-  tytInterval: 7,
   aytReady: false,
-  aytOverdueDays: Infinity,
-  aytInterval: 14,
   branchSubject: null,
   overallCoverage: 0,
+  rotationIndex: 0,
+  daysToTytExam: 300,
+  tytRound1Done: false,
 };
 
 describe("deneme süreleri (tür ayrımı)", () => {
@@ -52,56 +53,84 @@ describe("chooseMock", () => {
     assert.equal(chooseMock({ ...base, isMockDay: false, tytReady: true }), null);
   });
 
-  it("tam deneme zamanı gelmişse TYT tam denemesi seçer", () => {
-    const m = chooseMock({ ...base, tytReady: true, tytOverdueDays: 10 });
+  it("yalnız TYT hazırsa TYT tam denemesi seçer (165 dk)", () => {
+    const m = chooseMock({ ...base, tytReady: true, aytReady: false });
     assert.equal(m?.type, "tam");
     assert.equal(m?.exam, "TYT");
     assert.equal(m?.minutes, 165);
   });
 
-  it("AYT hazır ve gecikmişse AYT tam denemesi seçer (180 dk)", () => {
-    const m = chooseMock({ ...base, aytReady: true, aytOverdueDays: 20 });
+  it("yalnız AYT hazırsa AYT tam denemesi seçer (180 dk)", () => {
+    const m = chooseMock({ ...base, tytReady: false, aytReady: true });
     assert.equal(m?.type, "tam");
     assert.equal(m?.exam, "AYT");
     assert.equal(m?.minutes, 180);
   });
 
-  it("TYT ve AYT birlikte hazırsa en çok gecikmiş olanı seçer (denge)", () => {
-    // AYT daha gecikmiş → AYT.
-    const aytFirst = chooseMock({
-      ...base,
-      tytReady: true, tytOverdueDays: 8,
-      aytReady: true, aytOverdueDays: 40,
-    });
-    assert.equal(aytFirst?.exam, "AYT");
-    // TYT daha gecikmiş → TYT.
-    const tytFirst = chooseMock({
-      ...base,
-      tytReady: true, tytOverdueDays: 40,
-      aytReady: true, aytOverdueDays: 20,
-    });
-    assert.equal(tytFirst?.exam, "TYT");
-    // Eşitlikte TYT (çekirdek korunur).
-    const tie = chooseMock({
-      ...base,
-      tytReady: true, tytOverdueDays: 20,
-      aytReady: true, aytOverdueDays: 20,
-    });
-    assert.equal(tie?.exam, "TYT");
+  it("iki sınav da hazırsa seçim takvim dönüşümüyle belirlenir (sonuç kaydından bağımsız)", () => {
+    // TYT öncelikli çevrim (ilk tur sürüyor, sınava uzak): TYT, TYT, AYT.
+    const seq = [0, 1, 2, 3, 4, 5].map(
+      (i) =>
+        chooseMock({ ...base, tytReady: true, aytReady: true, rotationIndex: i })?.exam,
+    );
+    assert.deepEqual(seq, ["TYT", "TYT", "AYT", "TYT", "TYT", "AYT"]);
+    // Aynı rotationIndex her zaman aynı sınavı verir (deterministik).
+    const a = chooseMock({ ...base, tytReady: true, aytReady: true, rotationIndex: 5 });
+    const b = chooseMock({ ...base, tytReady: true, aytReady: true, rotationIndex: 5 });
+    assert.equal(a?.exam, b?.exam);
   });
 
-  it("zamanı gelmediyse branş denemesi koyar", () => {
+  it("TYT ilk turu bitince tam deneme 1:1 dönüşüme geçer", () => {
+    const seq = [0, 1, 2, 3].map(
+      (i) =>
+        chooseMock({ ...base, tytReady: true, aytReady: true, rotationIndex: i, tytRound1Done: true })
+          ?.exam,
+    );
+    assert.deepEqual(seq, ["TYT", "AYT", "TYT", "AYT"]);
+  });
+
+  it("sınava ≤ 60 gün kala 1:1 dönüşüme geçer (sınav yaklaşınca denge)", () => {
+    const seq = [0, 1, 2, 3].map(
+      (i) =>
+        chooseMock({ ...base, tytReady: true, aytReady: true, rotationIndex: i, daysToTytExam: 45 })
+          ?.exam,
+    );
+    assert.deepEqual(seq, ["TYT", "AYT", "TYT", "AYT"]);
+  });
+
+  it("yalnız TYT hazırsa branş değil tam TYT denemesi koyar", () => {
+    // Tam deneme hazır olduğunda branş denemesine düşülmez; branş yalnızca
+    // iki tam deneme de hazır değilken devreye girer.
+    const m = chooseMock({ ...base, tytReady: true, aytReady: false, branchSubject: "Fizik" });
+    assert.equal(m?.type, "tam");
+    assert.equal(m?.exam, "TYT");
+  });
+
+  it("tam deneme günü değilse (fullMockDue=false) tam deneme koymaz; branşa düşer", () => {
     const m = chooseMock({
       ...base,
-      tytReady: true, tytOverdueDays: 1, // aralık 7, gelmedi
+      fullMockDue: false,
+      tytReady: true,
+      aytReady: true,
       branchSubject: "Fizik",
     });
+    assert.equal(m?.type, "brans");
+    assert.equal(m?.subject, "Fizik");
+  });
+
+  it("tam deneme günü değilse ve branş yoksa mini deneme koyar", () => {
+    const m = chooseMock({ ...base, fullMockDue: false, tytReady: true, aytReady: true, overallCoverage: 0.4 });
+    assert.equal(m?.type, "mini");
+  });
+
+  it("iki tam deneme de hazır değilse branş denemesi koyar", () => {
+    const m = chooseMock({ ...base, tytReady: false, aytReady: false, branchSubject: "Fizik" });
     assert.equal(m?.type, "brans");
     assert.equal(m?.subject, "Fizik");
     assert.equal(m?.minutes, 40);
   });
 
-  it("branş için kapsam yoksa mini deneme koyar", () => {
+  it("hiçbiri hazır değilse ve branş yoksa mini deneme koyar", () => {
     const m = chooseMock({ ...base, overallCoverage: 0.4 });
     assert.equal(m?.type, "mini");
     assert.equal(m?.minutes, 25);
@@ -110,11 +139,33 @@ describe("chooseMock", () => {
   it("kapsam çok düşükse hiç deneme koymaz", () => {
     assert.equal(chooseMock({ ...base, overallCoverage: 0.1 }), null);
   });
+});
 
-  it("tam deneme aralığı dolmadan tam deneme seçilmez", () => {
-    // TYT aralığı 7: 6 gün geçmişse tam değil, branş/mini.
-    const m = chooseMock({ ...base, tytReady: true, tytOverdueDays: 6, branchSubject: "Kimya" });
-    assert.equal(m?.type, "brans");
+describe("plannedMockExam — TYT öncelikli takvim dönüşümü", () => {
+  it("ilk tur sürerken 2:1 (TYT, TYT, AYT)", () => {
+    const seq = [0, 1, 2, 3, 4, 5].map((i) =>
+      plannedMockExam(i, { tytRound1Done: false, daysToTytExam: 300 }),
+    );
+    assert.deepEqual(seq, ["TYT", "TYT", "AYT", "TYT", "TYT", "AYT"]);
+  });
+
+  it("ilk tur bitince 1:1", () => {
+    const seq = [0, 1, 2, 3].map((i) =>
+      plannedMockExam(i, { tytRound1Done: true, daysToTytExam: 200 }),
+    );
+    assert.deepEqual(seq, ["TYT", "AYT", "TYT", "AYT"]);
+  });
+
+  it("TYT sınavına ≤ 60 gün kala 1:1", () => {
+    const seq = [0, 1, 2, 3].map((i) =>
+      plannedMockExam(i, { tytRound1Done: false, daysToTytExam: 30 }),
+    );
+    assert.deepEqual(seq, ["TYT", "AYT", "TYT", "AYT"]);
+  });
+
+  it("negatif/sıfır rotationIndex güvenli", () => {
+    assert.equal(plannedMockExam(0, { tytRound1Done: false, daysToTytExam: 300 }), "TYT");
+    assert.doesNotThrow(() => plannedMockExam(-1, { tytRound1Done: false, daysToTytExam: 300 }));
   });
 });
 

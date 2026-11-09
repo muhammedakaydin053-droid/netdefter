@@ -2,7 +2,7 @@ import { frequencyScore, frequencyTier, DISTRIBUTION } from "@/data/distribution
 import { aytMockReady, aytUnlocks, isGaranti, tytMockReady } from "@/data/roadmap";
 import { buildTimeline, isCoreTopic, isOngoingTopic, orderAllowed, orderBoost, phaseFor } from "@/data/sequence";
 import { countsIssue, n, pctOf, sanitizeCounts } from "@/lib/calc";
-import { MIN_QUESTIONS_FOR_MASTERED, MASTERY_RATIO } from "@/lib/smart/progress";
+import { MIN_QUESTIONS_FOR_MASTERED, MASTERY_RATIO, learningStage } from "@/lib/smart/progress";
 import { splitBudget, capacity, dailyCapacity, type DayLoad } from "@/lib/smart/budget";
 import { topicAggregates, aytNets, tytNets, dailyTotals } from "@/lib/stats";
 import { overallCoverage, pickBranchSubject } from "@/lib/smart/mock-plan";
@@ -35,6 +35,28 @@ const ONGOING = [
 function daysBetween(a: string, b: string) {
   if (!a || !b) return 999;
   return Math.round((new Date(b + "T12:00:00").getTime() - new Date(a + "T12:00:00").getTime()) / 86400000);
+}
+
+/**
+ * `from` ile `to` arasında kaç DENEME GÜNÜ geçtiği (deneme fırsatı sayacı).
+ *
+ * Tam deneme sınavı seçimi bu sayaçla TAKVİM dönüşümüne bağlanır; kullanıcının
+ * hangi sınavın sonucunu girdiğine bakmaz. Sayım, program başından bugüne
+ * (bugün dahil) deneme günlerini sayar. Deneme günü kuralı `buildDailyPlan` ile
+ * aynıdır: hafta sonu hariç, `mockWeekdays` veya yoğun fazda hafta ortası (Çrş).
+ */
+function countMockDays(settings: ScheduleSettings, from: string, to: string): number {
+  if (!from || !to || to < from) return 0;
+  const timeline = buildTimeline(settings.programStart || from, settings.examDate || to);
+  let count = 0;
+  for (let d = from; d <= to; d = addDaysISO(d, 1)) {
+    const wd = new Date(d + "T12:00:00").getDay();
+    if (wd === 0) continue;
+    const ph = phaseFor(timeline, d);
+    const extra = ph.mockIntensity >= 2 && wd === 3;
+    if (settings.mockWeekdays.includes(wd) || extra) count += 1;
+  }
+  return count;
 }
 
 function toMin(hhmm: string) {
@@ -725,13 +747,6 @@ export function buildDailyPlan(
   if (mockDay) {
     const tytReady = tytMockReady(topics, tytExams);
     const aytReady = aytMockReady(topics, tytExams, aytExams);
-    const lastAyt = [...aytExams].filter((e) => e.date).sort((a, b) => a.date.localeCompare(b.date)).at(-1);
-    const lastTyt = [...tytExams].filter((e) => e.date).sort((a, b) => a.date.localeCompare(b.date)).at(-1);
-    const tytInterval = phase.mockIntensity >= 2 ? 4 : 7;
-    const aytInterval = 14;
-    // Gecikme günleri: hiç deneme yoksa Infinity (zamanı gelmiş sayılır).
-    const tytOverdueDays = lastTyt ? daysBetween(lastTyt.date, today) : Infinity;
-    const aytOverdueDays = lastAyt ? daysBetween(lastAyt.date, today) : Infinity;
     // Branş denemesi dersi: kapsam + zayıflık (yanlış/net) + rotasyon birlikte.
     // Eski kod yalnızca "en düşük kapsamlı uygun ders"i seçiyordu; dört branş
     // denemesinin tamamı Türkçe'ye gidiyordu. Deneme kayıtları ders türünü
@@ -745,22 +760,38 @@ export function buildDailyPlan(
       subjectLastMock: branchHistory,
     });
     // Deneme türü seçimi saf modelde (`mock-model.ts`): tam TYT / tam AYT /
-    // branş / mini. Süreler gerçek sınav sürelerinden gelir; hepsine 165 dk
-    // vermek yanlıştı. TYT/AYT dengesi gecikmeye göre kurulur.
-    // Deneme takvimi ilerleme sayacı: program başından beri geçen hafta.
-    // Hiç deneme kaydı yoksa TYT/AYT tam denemelerini dönüşümlü seçmek için.
-    const tick = Math.max(0, Math.floor(daysBetween(settings.programStart, today) / 7));
+    // branş / mini. Süreler gerçek sınav sürelerinden gelir. Tam deneme SINAVI
+    // takvim dönüşümüyle belirlenir; kullanıcının hangi sonucu girdiği temel
+    // TYT–AYT dağılımını değiştirmez (yalnızca hazırbulunuşluk etkiler).
+    //
+    // `mockOrdinal` deneme FIRSATI sayacıdır: program başından bugüne kadar
+    // geçen deneme günü sayısı. Sonuç kaydına bakmaz, böylece yalnız TYT (veya
+    // yalnız AYT) sonucu girilse de dağılım tersine dönmez.
+    const mockOrdinal = countMockDays(settings, settings.programStart, today);
+    const daysToTytExam = daysBetween(today, settings.examDate || today);
+    // TAM deneme kadansı (TAKVİME bağlı, sonuç kaydından bağımsız). İlk deneme
+    // gününde başlar; faz yoğunluğu 2 olduğunda her deneme günü tam denemeye
+    // uygundur, aksi hâlde iki deneme gününde bir. Tam deneme günü değilse branş/
+    // mini denemesi kurulur; böylece branş denemesi kadansı korunur.
+    const fullMockDue = mockOrdinal === 1 || (phase.mockIntensity >= 2 ? true : mockOrdinal % 2 === 0);
+    // TYT ilk turu bitti mi? Bitti sayılması için öğrenilmiş (Bitti + 15 soru +
+    // %70) TYT konusu kalmamalı. Bitince tam deneme dengesi 1:1'e kayar.
+    const tytRound1Done = !topics.some(
+      (t) =>
+        t.exam === "TYT" &&
+        !isOngoingTopic(t.exam, t.subject, t.topic) &&
+        learningStage(t) !== "ogrenildi",
+    );
     const mock = chooseMock({
       isMockDay: mockDay,
+      fullMockDue,
       tytReady,
-      tytOverdueDays,
-      tytInterval,
       aytReady,
-      aytOverdueDays,
-      aytInterval,
       branchSubject: branch?.subject ?? null,
       overallCoverage: overallCoverage(topics, "TYT"),
-      tick,
+      rotationIndex: mockOrdinal,
+      daysToTytExam,
+      tytRound1Done,
     });
     if (mock) {
       tasks.push({
@@ -1072,13 +1103,79 @@ export function buildDailyPlan(
   // Dersler EN GERİDE OLANDAN öne doğru dizilir (ilerleme = başlanmış/toplam):
   // büyük dersler daha çok slot alır, ama hiçbir ders kapı açıkken aç kalmaz.
   const progressOf = new Map<string, number>();
+  // Dersin son YENİ KONU ANLATIMI tarihi. "Maksimum bekleme" kuralı bu tarihten
+  // bugüne geçen günü ölçer; pratik/tekrar bekleme saymaz (aksi hâlde tekrar
+  // görevleri saati sıfırlayıp anlatım boşluğunu gizlerdi).
+  //
+  // Ölçüm iki kaynaktan birleşir:
+  //  - `daily` "Konu anlatımı" satırları (kesin sinyal). Yalnızca TYT'de
+  //    KARŞILIĞI OLMAYAN konular sayılır; Mat/Geo adları TYT ile örtüştüğü ve
+  //    `daily` satırı exam taşımadığı için onlar atlanır.
+  //  - Günlük kayıt yoksa `topics[].lastStudy` (AYT satırları) yedeği.
+  const lastLectureOf = new Map<string, string>();
+  const tytTopicKeys = new Set(topics.filter((t) => t.exam === "TYT").map((t) => `${t.subject}|${t.topic}`));
+  for (const d of daily) {
+    if (d.kind !== "Konu anlatımı" || !d.subject || !d.topic) continue;
+    if (tytTopicKeys.has(`${d.subject}|${d.topic}`)) continue;
+    const prev = lastLectureOf.get(d.subject);
+    if (!prev || d.date > prev) lastLectureOf.set(d.subject, d.date);
+  }
   for (const subject of aytBySubject.keys()) {
     const rows = topics.filter((t) => t.exam === "AYT" && t.subject === subject);
     progressOf.set(subject, rows.length ? rows.filter((t) => t.status !== "Başlamadım").length / rows.length : 1);
+    if (!lastLectureOf.has(subject)) {
+      const last = rows
+        .filter((t) => t.status !== "Başlamadım" && t.lastStudy)
+        .map((t) => t.lastStudy)
+        .sort()
+        .at(-1);
+      if (last) lastLectureOf.set(subject, last);
+    }
   }
-  const orderedSubjects = [...aytBySubject.keys()].sort(
-    (a, b) => (progressOf.get(a) ?? 0) - (progressOf.get(b) ?? 0),
-  );
+  // MAKSİMUM BEKLEME (ders devamlılığı).
+  //
+  // Salt "en geride olan önce" sıralaması, hızlı ilerleyen bir dersi (ör. AYT
+  // Fizik) sürekli geriye itiyordu: ders Aralık sonunda öne geçtiği için Ocak'ta
+  // ~46 gün yeni konu anlatımı almadı ve 5 konu aç kaldı. Düzeltme, kapısı açık
+  // ve ilk turu bitmemiş bir ders `AYT_MAX_WAIT_DAYS` gündür yeni konu anlatımı
+  // almadıysa onu sıralamada ÖNE taşır. Eşitlik değil, ihmal önleme amaçlanır:
+  // bekleme süresi dolmamış dersler yine ilerlemeye göre sıralanır.
+  //
+  // Bu kural TYT kontenjanına (tytPerDay) dokunmaz; yalnızca AYT dersleri
+  // arasındaki sırayı etkiler. Tamamlanmış dersler zaten `aytBySubject`'e
+  // girmez (status "Başlamadım" süzgeci) ve kapısı kapalı dersler de burada
+  // yoktur; dolayısıyla tamamlanmış veya kilitli dersler yeniden açılmaz.
+  const AYT_MAX_WAIT_DAYS = 10;
+  const waitOf = (subject: string): number => {
+    const last = lastLectureOf.get(subject);
+    return last ? daysBetween(last, today) : 9999;
+  };
+  const overdue = (subject: string) => waitOf(subject) >= AYT_MAX_WAIT_DAYS;
+  const baseOrder = [...aytBySubject.keys()].sort((a, b) => {
+    const oa = overdue(a) ? 1 : 0;
+    const ob = overdue(b) ? 1 : 0;
+    if (oa !== ob) return ob - oa; // bekleme süresi dolan ders öne
+    if (oa === 1) return waitOf(b) - waitOf(a); // en çok bekleyen önce
+    return (progressOf.get(a) ?? 0) - (progressOf.get(b) ?? 0); // yoksa en geride olan
+  });
+  // GÜN DÖNGÜSÜ (dönüşümlü adalet). Yalnızca sıralamaya güvenmek yetmiyor:
+  // günlük AYT kontenjanı 1–2 slot olduğundan, listenin hep başındaki dersler
+  // hizmet alıp arkadakiler haftalarca bekliyordu. Sıra, program başından beri
+  // geçen güne göre DÖNDÜRÜLÜR; böylece her açık kapılı ders sırayla öne geçer.
+  // Bu, TYT ders dengesinde kullanılan `offset` deseninin aynısıdır.
+  //
+  // Bekleme süresi dolmuş dersler (yukarıda öne alınanlar) yine başta kalır;
+  // dönüşüm onların ARASINDA değil, ders listesinin tamamında uygulanır ve
+  // bekleme kuralı dönüşümden sonra da korunur.
+  const aytDayIndex = Math.max(0, Math.floor(daysBetween(settings.programStart || today, today)));
+  const nSubjects = Math.max(1, baseOrder.length);
+  const rotate = aytDayIndex % nSubjects;
+  const rotated = [...baseOrder.slice(rotate), ...baseOrder.slice(0, rotate)];
+  // Bekleme süresi dolan dersler dönüşümle geriye düşmesin: onları listenin
+  // başına sabitle, kalanları dönüşümlü sırayla ekle.
+  const due = rotated.filter(overdue);
+  const notDue = rotated.filter((s) => !overdue(s));
+  const orderedSubjects = [...due, ...notDue];
   // `ranked` öncelik sıralıdır, ders sırası değil; bir dersin önde görünen
   // konusu sert sıra kuralınca bloke olabilir (ör. Fizik'te "Newton Yasaları"
   // gelip "Vektörler" beklemede). Bu yüzden sıradaki konu `orderAllowed` ile
