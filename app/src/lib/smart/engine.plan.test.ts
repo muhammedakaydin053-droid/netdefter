@@ -1598,4 +1598,18 @@ describe("mergeTopicSlots — aynı konu tek satırda gösterilir", () => {
       assert.equal(new Set(keys).size, keys.length, `${day.date}: aynı konu birden çok satırda`);
     }
   });
+
+  it("haftanın her çalışma günü yeni konu açar (pazar hariç)", () => {
+    // Izgara bir önizlemedir; her günün anlatımı yapılmış varsayılmalı ki ilerleme
+    // kapısı sonraki günlerde açılabilsin. Aksi hâlde haftanın son günleri (ör.
+    // pazartesi) yeni konusuz kalıyordu: ders başına yalnızca ilk konu açılabiliyordu.
+    const grid = E.buildWeekGrid(seed(), [], [], [], [], S, [], "2026-11-10");
+    for (const day of grid) {
+      if (day.weekday === 0) continue; // pazar hafif gün, yeni konu beklenmez
+      const hasNew = day.slots.some((s: any) =>
+        s.kinds ? s.kinds.includes("Konu anlatımı") : s.kind === "Konu anlatımı",
+      );
+      assert.ok(hasNew, `${day.date} (wd=${day.weekday}): yeni konu yok`);
+    }
+  });
 });

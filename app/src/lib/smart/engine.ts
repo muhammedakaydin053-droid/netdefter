@@ -1774,12 +1774,29 @@ export function buildWeekGrid(
   // Hafta ızgarası: konu anlatımı tekrarını engellemek için anlatılmış konular
   // okunur; geçmişi yeniden oynatmaya gerek yok (bkz. `taughtTopics`).
   const used = taughtTopics(topics, daily);
+  // Izgara bir ÖNİZLEMEDİR: her günün anlatımı yapılmış varsayılır ki ilerleme
+  // kapısı (aynı derste önceki konu öğrenilmeden sonrakine geçilmez) sonraki
+  // günlerde açılabilsin. Konuları sabit tutmak, ders başına yalnızca ilk konuyu
+  // açılabilir bırakıyor ve haftanın son günleri (ör. pazartesi) yeni konusuz
+  // kalıyordu. Anlatılan konu, önizleme boyunca öğrenilmiş sayılır.
+  let workingTopics = topics;
   return Array.from({ length: 7 }, (_, i) => {
     const date = addDaysISO(pace.from, i);
     const weekday = new Date(date + "T12:00:00").getDay();
-    const { slots } = buildDailyPlan(topics, daily, wrongs, tytExams, aytExams, settings, carry, date, used);
+    const { slots } = buildDailyPlan(workingTopics, daily, wrongs, tytExams, aytExams, settings, carry, date, used);
+    const lectured = new Set<string>();
     for (const sl of slots) {
-      if (sl.kind === "Konu anlatımı") used.add(`${sl.exam}|${sl.subject}|${sl.topic}`);
+      if (sl.kind === "Konu anlatımı") {
+        used.add(`${sl.exam}|${sl.subject}|${sl.topic}`);
+        lectured.add(`${sl.exam}|${sl.subject}|${sl.topic}`);
+      }
+    }
+    if (lectured.size) {
+      workingTopics = workingTopics.map((t) =>
+        lectured.has(`${t.exam}|${t.subject}|${t.topic}`) && t.status !== "Bitti"
+          ? { ...t, status: "Bitti", lastStudy: date, total: 30, correct: 24, wrong: 6 }
+          : t,
+      );
     }
     // Aynı konunun anlatımı ile soru çözümü tek satırda gösterilir (ör. "Canlıların
     // Ortak Özellikleri · konu + test"); listede konu iki kez yazılmaz.
