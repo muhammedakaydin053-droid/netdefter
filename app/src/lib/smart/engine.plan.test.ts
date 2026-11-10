@@ -1546,3 +1546,56 @@ describe("sınav günü koruması (H1) — pozitif", () => {
     assert.equal(tyt.slots.length, 0, "özel examDate günü korunmadı");
   });
 });
+
+describe("mergeTopicSlots — aynı konu tek satırda gösterilir", () => {
+  it("aynı ders/konunun anlatım + soru çözümünü tek satıra indirir", () => {
+    const slots = [
+      { id: "a", start: "09:30", end: "10:25", exam: "TYT", subject: "Biyoloji", topic: "Hücre", kind: "Konu anlatımı", targetQ: 0, minutes: 55, priority: "orta", reason: "" },
+      { id: "b", start: "10:25", end: "11:20", exam: "TYT", subject: "Biyoloji", topic: "Hücre", kind: "Soru çözümü", targetQ: 18, minutes: 55, priority: "orta", reason: "" },
+    ];
+    const merged = E.mergeTopicSlots(slots);
+    assert.equal(merged.length, 1, "konu iki satır olarak kaldı");
+    assert.deepEqual(merged[0].kinds, ["Konu anlatımı", "Soru çözümü"]);
+    assert.equal(merged[0].minutes, 110);
+    assert.equal(merged[0].targetQ, 18);
+    assert.equal(merged[0].start, "09:30");
+    assert.equal(merged[0].end, "11:20");
+  });
+
+  it("farklı konuları birleştirmez", () => {
+    const slots = [
+      { id: "a", start: "09:30", end: "10:25", exam: "TYT", subject: "Biyoloji", topic: "Hücre", kind: "Konu anlatımı", targetQ: 0, minutes: 55, priority: "orta", reason: "" },
+      { id: "b", start: "11:20", end: "12:15", exam: "TYT", subject: "Coğrafya", topic: "Doğa", kind: "Konu anlatımı", targetQ: 0, minutes: 55, priority: "orta", reason: "" },
+    ];
+    assert.equal(E.mergeTopicSlots(slots).length, 2, "farklı konular yanlışlıkla birleşti");
+  });
+
+  it("araya giren molayı yutmaz; gerçek aralıkları `ranges` ile verir", () => {
+    const slots = [
+      { id: "a", start: "11:20", end: "12:15", exam: "TYT", subject: "Coğrafya", topic: "Doğa", kind: "Konu anlatımı", targetQ: 0, minutes: 55, priority: "orta", reason: "" },
+      { id: "b", start: "13:20", end: "14:15", exam: "TYT", subject: "Coğrafya", topic: "Doğa", kind: "Soru çözümü", targetQ: 18, minutes: 55, priority: "orta", reason: "" },
+    ];
+    const merged = E.mergeTopicSlots(slots);
+    assert.equal(merged.length, 1);
+    assert.deepEqual(merged[0].ranges, ["11:20–12:15", "13:20–14:15"], "mola yutuldu");
+    assert.equal(merged[0].minutes, 110, "süre 110 dk olmalı (molalar sayılmaz)");
+  });
+
+  it("korunan (life) bloklara dokunmaz", () => {
+    const slots = [
+      { id: "a", start: "09:30", end: "10:25", exam: "TYT", subject: "Biyoloji", topic: "Hücre", kind: "Konu anlatımı", targetQ: 0, minutes: 55, priority: "orta", reason: "" },
+      { id: "b", start: "10:25", end: "11:20", exam: "TYT", subject: "Biyoloji", topic: "Hücre", kind: "Soru çözümü", targetQ: 18, minutes: 55, priority: "orta", reason: "" },
+      { id: "l", start: "08:00", end: "08:40", exam: "", subject: "Kahvaltı", topic: "Kahvaltı", kind: "Konu anlatımı", targetQ: 0, minutes: 40, priority: "orta", reason: "", life: true },
+    ];
+    const merged = E.mergeTopicSlots(slots);
+    assert.equal(merged.filter((s: any) => s.life).length, 1, "korunan blok kayboldu");
+  });
+
+  it("gerçek planda hiçbir gün aynı konuyu iki kez göstermez", () => {
+    const grid = E.buildWeekGrid(seed(), [], [], [], [], S, [], "2026-11-09");
+    for (const day of grid) {
+      const keys = day.slots.map((s: any) => `${s.exam}|${s.subject}|${s.topic}`);
+      assert.equal(new Set(keys).size, keys.length, `${day.date}: aynı konu birden çok satırda`);
+    }
+  });
+});

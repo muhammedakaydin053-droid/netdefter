@@ -3,9 +3,16 @@ import { Link } from "@tanstack/react-router";
 import { HealthBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/lib/store";
-import { buildDailyPlan, buildInsights, dueReviews, rankTopics } from "@/lib/smart/engine";
+import { buildDailyPlan, buildInsights, dueReviews, mergeTopicSlots, rankTopics } from "@/lib/smart/engine";
 import { formatPct, todayISO, formatDate } from "@/lib/utils";
 import { requestAiComment } from "@/lib/ai-comment";
+import type { PlanSlot } from "@/lib/smart/types";
+
+/** Birleştirilmiş satırın görev türleri; ör. "Konu anlatımı + Soru çözümü". */
+function kindLabel(s: PlanSlot): string {
+  const kinds = s.kinds && s.kinds.length > 1 ? s.kinds : [s.kind];
+  return kinds.join(" + ");
+}
 
 export function TodayPlanPanel() {
   const topics = useAppStore((s) => s.topics);
@@ -20,6 +27,8 @@ export function TodayPlanPanel() {
   const branchMockHistory = useAppStore((s) => s.branchMockHistory);
   const markBranchMock = useAppStore((s) => s.markBranchMock);
   const { slots, analyzedWrongIds, branchMockSubject } = buildDailyPlan(topics, daily, wrongs, tytExams, aytExams, settings, carry, todayISO(), undefined, analyzedWrongs, branchMockHistory);
+  // Aynı konunun anlatımı ve soru çözümü tek satırda gösterilir (görünüm amaçlı).
+  const merged = mergeTopicSlots(slots);
   // `analyzedWrongIds` yalnızca bugün tamamlanmış (günlük kaydı girilmiş) yanlış
   // analizi görevlerini taşır; üretim/yerleşim tek başına işaretlemez.
   useEffect(() => {
@@ -47,17 +56,17 @@ export function TodayPlanPanel() {
         </p>
       ) : (
         <ol className="space-y-2">
-          {slots.map((s) => (
+          {merged.map((s) => (
             <li key={s.id} className="rounded-[var(--radius-md)] border border-border bg-bg-elevated px-3 py-2.5">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div className="font-medium tabular-nums">
-                  {s.start}–{s.end}
+                  {s.ranges?.length ? s.ranges.join(" · ") : `${s.start}–${s.end}`}
                   <span className="ml-2 font-normal text-fg">
                     {s.exam ? `${s.exam} ${s.subject}` : s.subject} — {s.topic}
                   </span>
                 </div>
                 <span className="text-xs text-muted">
-                  {s.kind} · {s.minutes} dk{s.targetQ ? ` · ${s.targetQ} soru` : ""} · {s.priority}
+                  {kindLabel(s)} · {s.minutes} dk{s.targetQ ? ` · ${s.targetQ} soru` : ""} · {s.priority}
                 </span>
               </div>
               <p className="mt-1 text-xs text-muted">{s.reason}</p>

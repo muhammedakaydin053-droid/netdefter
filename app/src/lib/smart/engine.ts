@@ -1702,6 +1702,64 @@ export function buildDailyPlan(
   return { slots, life, analyzedWrongIds, branchMockSubject };
 }
 
+/**
+ * Aynı ders/konunun görevlerini tek satırda toplar (görünüm amaçlı).
+ *
+ * Motor bir konu için anlatım + soru çözümünü ayrı slotlar olarak üretir; hafta
+ * ızgarasında ve günlük sırada konu iki kez yazılmasın diye bunlar tek slota
+ * indirilir. Süreler ve soru hedefleri toplanır, görev türleri `kinds` alanında
+ * tutulur, `ranges` alanı bitişik aralıkları birleştirilmiş gerçek saat
+ * aralıklarını taşır (araya giren mola yanlış gösterilmez). Görünüm dışındaki
+ * hiçbir hesaplama (tamamlanma, ilerleme, deneme) bundan etkilenmez.
+ */
+export function mergeTopicSlots(slots: PlanSlot[]): PlanSlot[] {
+  const out: PlanSlot[] = [];
+  const index = new Map<string, number>();
+  const intervals = new Map<string, [string, string][]>();
+  for (const s of slots) {
+    if (s.life) {
+      out.push(s);
+      continue;
+    }
+    const key = `${s.exam}|${s.subject}|${s.topic}`;
+    const at = index.get(key);
+    if (at === undefined) {
+      index.set(key, out.length);
+      intervals.set(key, [[s.start, s.end]]);
+      out.push({ ...s, kinds: [s.kind] });
+      continue;
+    }
+    const prev = out[at];
+    const kinds = prev.kinds ?? [prev.kind];
+    if (!kinds.includes(s.kind)) kinds.push(s.kind);
+    intervals.get(key)!.push([s.start, s.end]);
+    out[at] = {
+      ...prev,
+      start: prev.start <= s.start ? prev.start : s.start,
+      end: prev.end >= s.end ? prev.end : s.end,
+      minutes: prev.minutes + s.minutes,
+      targetQ: (prev.targetQ ?? 0) + (s.targetQ ?? 0),
+      kinds,
+      wrongIds: [...(prev.wrongIds ?? []), ...(s.wrongIds ?? [])],
+    };
+  }
+  // Bitişik aralıkları birleştir (ör. 09:30–10:25 + 10:25–11:20 → 09:30–11:20);
+  // aradaki molalar korunur (ör. 11:20–12:15 + 13:20–14:15 ayrı kalır).
+  for (const s of out) {
+    const iv = intervals.get(`${s.exam}|${s.subject}|${s.topic}`);
+    if (!iv) continue;
+    const sorted = [...iv].sort((a, b) => a[0].localeCompare(b[0]));
+    const merged: [string, string][] = [];
+    for (const [a, b] of sorted) {
+      const last = merged[merged.length - 1];
+      if (last && a <= last[1]) last[1] = b > last[1] ? b : last[1];
+      else merged.push([a, b]);
+    }
+    s.ranges = merged.map(([a, b]) => `${a}–${b}`);
+  }
+  return out;
+}
+
 export function buildWeekGrid(
   topics: TopicRow[],
   daily: DailyRow[],
@@ -1723,13 +1781,16 @@ export function buildWeekGrid(
     for (const sl of slots) {
       if (sl.kind === "Konu anlatımı") used.add(`${sl.exam}|${sl.subject}|${sl.topic}`);
     }
+    // Aynı konunun anlatımı ile soru çözümü tek satırda gösterilir (ör. "Canlıların
+    // Ortak Özellikleri · konu + test"); listede konu iki kez yazılmaz.
+    const merged = mergeTopicSlots(slots);
     return {
       date,
       weekday,
       light: weekday === 0,
       today: date === today,
       startDay: date === pace.start,
-      slots: slots.slice(0, 4),
+      slots: merged.slice(0, 4),
     };
   });
 }

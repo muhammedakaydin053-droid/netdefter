@@ -43,6 +43,10 @@ export interface PlanSlot {
   /** Yanlış analizi görevinin bağlı olduğu yanlış kayıtlarının kimlikleri. */
   wrongIds?: string[];
   life?: boolean;
+  /** Birleştirilmiş satırda gösterilen görev türleri (görünüm amaçlı). */
+  kinds?: StudyType[];
+  /** Birleştirilmiş satırın gerçek saat aralıkları; ör. ["09:30–11:20"]. */
+  ranges?: string[];
 }
 
 export interface ReviewRec {

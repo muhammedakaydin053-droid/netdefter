@@ -6,15 +6,35 @@ import { HealthBadge } from "@/components/ui/badge";
 import { Kpi } from "@/components/kpi";
 import { useAppStore } from "@/lib/store";
 import { aytMockReady, aytUnlocks, gateBlockers, GATE_DEFS, lastExamNet, ROADMAP_PHASES, tytMockReady } from "@/data/roadmap";
-import { buildDailyPlan, buildWeekGrid, planPace, weeklyBlueprint } from "@/lib/smart/engine";
+import { buildDailyPlan, buildWeekGrid, mergeTopicSlots, planPace, weeklyBlueprint } from "@/lib/smart/engine";
 import { phaseFor } from "@/data/sequence";
 import { PLANNING_BANDS_NOTE, SOURCES, SOURCES_CHECKED_AT, TARGETS } from "@/data/targets";
 import { formatDate, formatNet, todayISO } from "@/lib/utils";
-import type { ScheduleSettings } from "@/lib/smart/types";
+import type { PlanSlot, ScheduleSettings } from "@/lib/smart/types";
 
 export const Route = createFileRoute("/program")({ component: ProgramPage });
 
 const DAYS = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
+
+/** Birleştirilmiş satırın görev türleri; ör. "Konu anlatımı + Soru çözümü". */
+function kindLabel(s: PlanSlot): string {
+  const kinds = s.kinds && s.kinds.length > 1 ? s.kinds : [s.kind];
+  return kinds.join(" + ");
+}
+
+const KIND_SHORT: Record<string, string> = {
+  "Konu anlatımı": "konu",
+  "Soru çözümü": "test",
+  Tekrar: "tekrar",
+  Deneme: "deneme",
+  "Yanlış analizi": "analiz",
+};
+
+/** Hafta ızgarası için kısa tür etiketi; ör. "konu + test". */
+function kindShort(s: PlanSlot): string {
+  const kinds = s.kinds && s.kinds.length > 1 ? s.kinds : [s.kind];
+  return kinds.map((k) => KIND_SHORT[k] ?? k).join(" + ");
+}
 
 function ProgramPage() {
   const topics = useAppStore((s) => s.topics);
@@ -43,7 +63,7 @@ function ProgramPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analyzedWrongIds.join(","), branchMockSubject]);
   const week = weeklyBlueprint(topics, daily, wrongs, settings);
-  const timeline = [...slots, ...life].sort((a, b) => a.start.localeCompare(b.start));
+  const timeline = mergeTopicSlots([...slots, ...life]).sort((a, b) => a.start.localeCompare(b.start));
   const unlock = aytUnlocks(topics);
   const gateNames = Object.fromEntries(GATE_DEFS.map((g) => [g.subject, g.names]));
   const MAT_NAMES = gateNames["Matematik"];
@@ -185,6 +205,7 @@ function ProgramPage() {
                   d.slots.map((s) => (
                     <li key={s.id} className="text-xs leading-snug">
                       <span className="text-muted">{s.start}</span> {s.topic}
+                      <span className="text-muted"> · {kindShort(s)}</span>
                     </li>
                   ))
                 )}
@@ -222,11 +243,11 @@ function ProgramPage() {
               key={s.id}
               className={`rounded-[var(--radius-md)] border px-3 py-2 ${s.life ? "border-border bg-bg-elevated text-muted" : "border-border bg-surface"}`}
             >
-              <span className="tabular-nums font-medium">{s.start}–{s.end}</span>
+              <span className="tabular-nums font-medium">{s.ranges?.length ? s.ranges.join(" · ") : `${s.start}–${s.end}`}</span>
               <span className="ml-2">{s.life ? s.topic : `${s.exam} ${s.subject} — ${s.topic}`}</span>
               {!s.life ? (
                 <span className="ml-2 text-xs text-muted">
-                  {s.kind} · {s.minutes} dk {s.targetQ ? `· ${s.targetQ} soru` : ""} · {s.priority}
+                  {kindLabel(s)} · {s.minutes} dk {s.targetQ ? `· ${s.targetQ} soru` : ""} · {s.priority}
                 </span>
               ) : (
                 <span className="ml-2 text-xs">korunan blok</span>
