@@ -44,7 +44,7 @@ describe("buildTimeline", () => {
   it("anchors phase boundaries to the user's target dates", () => {
     assert.deepEqual(
       timeline.map((p) => p.from),
-      ["2026-10-28", "2027-02-08", "2027-04-23", "2027-05-07", "2027-05-17"],
+      ["2026-10-28", "2027-02-15", "2027-04-23", "2027-05-07", "2027-05-17"],
     );
   });
 
@@ -61,6 +61,7 @@ describe("buildTimeline", () => {
     const broken = buildTimeline("2026-10-28", "2027-06-19", 14, {
       programStart: "2026-10-28",
       tytRound1: "2027-05-01",
+      tytPaceAnchor: "2027-05-01",
       aytRound1: "2027-02-01",
       aytFlex: "2027-03-01",
       gapFill: "2027-04-01",

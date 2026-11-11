@@ -46,11 +46,17 @@ describe("program başlangıcı — yeni tarih", () => {
     assert.equal(TARGETS.aytExam, "2027-06-20");
   });
 
-  it("ilk tur hedefleri bir gün kaydırılmadı (önceki hedefler korunur)", () => {
-    assert.equal(TARGETS.tytRound1, "2027-02-08");
+  it("ilk tur hedefleri: TYT 15.02.2027 (gösterilen), AYT 23.04.2027", () => {
+    assert.equal(TARGETS.tytRound1, "2027-02-15");
     assert.equal(TARGETS.aytRound1, "2027-04-23");
     assert.equal(TARGETS.aytFlex, "2027-05-07");
     assert.equal(TARGETS.gapFill, "2027-05-17");
+  });
+
+  it("motorun TYT faz çapası ayrı tutulur (iç referans 08.02.2027)", () => {
+    // Gösterilen hedef 15.02; motor tempo penceresi 08.02 çapasına göre kurulur.
+    // Ayrım yapılmazsa bitiş 23.02'ye kayıyordu (bkz. targets.ts).
+    assert.equal(TARGETS.tytPaceAnchor, "2027-02-08");
   });
 });
 
@@ -79,10 +85,10 @@ describe("planlama kuralları — tarih kaydırmasında değişmedi", () => {
     const tl = TIMELINE.buildTimeline("2026-11-11", "2027-06-19");
     assert.equal(tl[0].from, "2026-11-11");
     assert.equal(tl.at(-1).to, "2027-06-19");
-    // Sınırlar hedef tarihlere çapalı; başlangıç kaydı bunları kaydırmadı.
+    // Sınırlar görünür hedef tarihlere çapalı (TYT 15.02.2027).
     assert.deepEqual(
       tl.map((p: any) => p.from),
-      ["2026-11-11", "2027-02-08", "2027-04-23", "2027-05-07", "2027-05-17"],
+      ["2026-11-11", "2027-02-15", "2027-04-23", "2027-05-07", "2027-05-17"],
     );
   });
 });

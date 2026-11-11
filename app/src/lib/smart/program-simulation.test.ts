@@ -292,7 +292,7 @@ describe("tam dönem simülasyonu (11.11.2026 – 20.06.2027)", () => {
   it("senaryo 1 — ilk tur hedeflerine yetişilir, AYT TYT'den önce bitmez", () => {
     assert.ok(A.lastLecture.TYT, "TYT anlatımı hiç yapılmadı");
     assert.ok(A.lastLecture.AYT, "AYT anlatımı hiç yapılmadı");
-    assert.ok(A.lastLecture.TYT! <= "2027-02-08", `TYT ilk tur ${A.lastLecture.TYT} (hedef 08.02.2027)`);
+    assert.ok(A.lastLecture.TYT! <= "2027-02-15", `TYT ilk tur ${A.lastLecture.TYT} (hedef 15.02.2027)`);
     assert.ok(A.lastLecture.AYT! <= "2027-04-23", `AYT ilk tur ${A.lastLecture.AYT} (hedef 23.04.2027)`);
     assert.ok(A.lastLecture.AYT! >= A.lastLecture.TYT!, "AYT TYT'den önce bitti (dengesizlik)");
   });
@@ -322,7 +322,7 @@ describe("tam dönem simülasyonu (11.11.2026 – 20.06.2027)", () => {
   });
 
   it("senaryo 2 — ilk tur hedeflerine yetişilir, AYT TYT'den önce bitmez", () => {
-    assert.ok(B.lastLecture.TYT! <= "2027-02-08", `TYT ilk tur ${B.lastLecture.TYT} (hedef 08.02.2027)`);
+    assert.ok(B.lastLecture.TYT! <= "2027-02-15", `TYT ilk tur ${B.lastLecture.TYT} (hedef 15.02.2027)`);
     assert.ok(B.lastLecture.AYT! <= "2027-04-23", `AYT ilk tur ${B.lastLecture.AYT} (hedef 23.04.2027)`);
     assert.ok(B.lastLecture.AYT! >= B.lastLecture.TYT!, "AYT TYT'den önce bitti (dengesizlik)");
   });
@@ -414,8 +414,8 @@ describe("AYT ders devamlılığı (maksimum bekleme)", () => {
   it("TYT ilerlemesi bozulmaz (hedefe yetişir, AYT'den önce biter)", () => {
     for (const [label, m] of [["senaryo 1", A], ["senaryo 2", B]] as const) {
       assert.ok(
-        m.lastLecture.TYT! <= "2027-02-08",
-        `${label}: TYT ilk tur ${m.lastLecture.TYT} (hedef 08.02.2027)`,
+        m.lastLecture.TYT! <= "2027-02-15",
+        `${label}: TYT ilk tur ${m.lastLecture.TYT} (hedef 15.02.2027)`,
       );
       assert.equal(m.remaining.TYT, 0, `${label}: TYT'de ${m.remaining.TYT} konu kaldı`);
       assert.ok(

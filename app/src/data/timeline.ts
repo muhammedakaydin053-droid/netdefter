@@ -61,6 +61,8 @@ export function buildTimeline(
   // Hedef tarihleri programa göre kırp: program başlangıcından önce veya sınavdan
   // sonra kalan hedefler kullanılamaz, yoksa fazlar ters düşer.
   const clamp = (d: string) => (d < programStart ? programStart : d > examDate ? examDate : d);
+  // Görünür faz sınırı kullanıcı hedefinden (`tytRound1`) gelir; motorun İÇ
+  // tempo çapası (`tytPaceAnchor`) ayrıdır ve `planPace` içinde kullanılır.
   const t1 = clamp(targets.tytRound1);
   const t2 = clamp(targets.aytRound1);
   const t3 = clamp(targets.aytFlex);

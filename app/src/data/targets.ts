@@ -10,8 +10,21 @@
 export interface Targets {
   /** Çalışma başlangıcı. */
   programStart: string;
-  /** TYT ilk konu turu hedefi. */
+  /** TYT ilk konu turu hedefi (kullanıcıya gösterilen). */
   tytRound1: string;
+  /**
+   * Motorun TYT TEMPO penceresi çapası (iç referans).
+   *
+   * `tytRound1`'den AYRI tutulur. Neden: TYT'nin son dersinde "gün aşırı
+   * serpiştirme" kuralı çalışırken günlük tempo penceresi bu tarihe göre
+   * hesaplanır. `tytRound1`'i (gösterilen hedefi) 15.02'ye çekmek tek başına
+   * pencereyi 7 gün uzatıp tempoyu düşürüyor ve bitişi 23.02'ye kaydırıyordu.
+   * Çapa 08.02 kalınca serpiştirme kuralı TYT'yi tam 15.02'de bitiriyor.
+   *
+   * Yalnızca `planPace` içindeki `tytWindowDays` hesabında kullanılır; faz
+   * takviminde ve ekranda görünmez (bkz. `engine.ts`, `timeline.ts`).
+   */
+  tytPaceAnchor: string;
   /** AYT ilk konu turu hedefi. */
   aytRound1: string;
   /** AYT için esnek son tarih. */
@@ -28,7 +41,11 @@ export interface Targets {
 
 export const TARGETS: Targets = {
   programStart: "2026-11-11",
-  tytRound1: "2027-02-08",
+  tytRound1: "2027-02-15",
+  // Motorun TYT tempo/faz penceresi bu iç çapaya göre kurulur. `tytRound1`'i
+  // (ekran hedefi) 15.02'ye çekmek tek başına bitişi 23.02'ye kaydırıyordu;
+  // çapa 08.02 kalınca serpiştirme kuralı TYT'yi tam 15.02'de bitiriyor.
+  tytPaceAnchor: "2027-02-08",
   aytRound1: "2027-04-23",
   aytFlex: "2027-05-07",
   gapFill: "2027-05-17",

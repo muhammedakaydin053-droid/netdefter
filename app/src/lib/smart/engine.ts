@@ -633,7 +633,11 @@ export function planPace(topics: TopicRow[], settings: ScheduleSettings, today =
   // TYT'nin günde kaç yeni konu alması gerektiği. AYT kapıları açılınca motor
   // günlük 2 slotu iki sınava bölüyordu ve TYT günde ~1 konuya düşüp hedefi
   // 2 ay geçiyordu. TYT önce bitmeli; AYT kalan slotu kullanır.
-  const tytAnchor = timeline[0]?.to ?? exam;
+  // TYT tempo penceresi İÇ çapaya göre kurulur (`TARGETS.tytPaceAnchor`), görünür
+  // faz sınırına (`timeline[0].to` = `tytRound1`) göre değil. Ayrım yapılmazsa
+  // hedefi 15.02'ye çekmek pencereyi 7 gün uzatıp tempoyu düşürüyor ve TYT bitişi
+  // 23.02'ye kayıyordu; çapa 08.02 kalınca serpiştirme kuralı tam 15.02'de bitirir.
+  const tytAnchor = TARGETS.tytPaceAnchor || timeline[0]?.to || exam;
   const tytWindowDays = Math.max(
     1,
     (() => {
@@ -1404,11 +1408,40 @@ export function buildDailyPlan(
     const k = `${r.exam}|${r.subject}`;
     awaitingBySubject.set(k, (awaitingBySubject.get(k) ?? 0) + 1);
   }
+
+  // SON DERS SERPİŞTİRME (son dönem dengesi).
+  //
+  // TYT'de tek ders kaldığında (diğer TYT dersleri bitmiş), o ders günde 1 konuyla
+  // arka arkaya geliyordu: zor konular (ör. Fonksiyonlar, Polinomlar) tekrarsız ve
+  // asgari süreyle son günlere sıkışıyordu. Bu kural o dersin yeni konusunu GÜN
+  // AŞIRI'ya indirir; aradaki gün AYT'ye kalır ve konu bir gün "dinlenir".
+  // Karar TAKVİME bağlıdır (sonuç kaydından bağımsız), böylece simülasyon ile
+  // canlı ekran aynı davranır. Yalnızca son dersin serpiştirilmesidir; AYT
+  // kontenjanı yoksa (iş bitmişse) uygulanmaz.
+  const soleTytSubjects = new Set(
+    topics
+      .filter(
+        (t) =>
+          t.exam === "TYT" &&
+          !isOngoingTopic(t.exam, t.subject, t.topic) &&
+          t.status !== "Bitti",
+      )
+      .map((t) => t.subject),
+  );
+  const tytSoleSubject = soleTytSubjects.size === 1 ? [...soleTytSubjects][0] : null;
+  const tytAlternateOff = Math.abs(daysBetween(settings.programStart || today, today)) % 2 === 1;
+  // Serpiştirme gününde TYT kontenjanı AYT'ye DEVREDİLİR: boşalan slot boşa
+  // gitmez, AYT 2 konu alır (istenen desen: "TYT+AYT" → "AYT+AYT").
+  const tytSoleAlternate = tytSoleSubject !== null && pace.aytPerDay > 0;
+  const tytSkipToday = tytSoleAlternate && tytAlternateOff;
+  const effTytPerDay = tytSkipToday ? 0 : pace.tytPerDay;
+  const effAytPerDay = tytSkipToday ? Math.min(2, pace.aytPerDay + 1) : pace.aytPerDay;
+
   for (const r of newCandidates) {
     if (newCount >= newCap) break;
     const isTyt = r.exam === "TYT";
-    if (isTyt && tytNew >= pace.tytPerDay) continue;
-    if (!isTyt && aytNew >= pace.aytPerDay) continue;
+    if (isTyt && tytNew >= effTytPerDay) continue;
+    if (!isTyt && aytNew >= effAytPerDay) continue;
     // Ders kendi pratiğini biriktirdiyse (>=2 bekleyen) yeni konusunu açmaz.
     if ((awaitingBySubject.get(`${r.exam}|${r.subject}`) ?? 0) >= 2) continue;
     if (addTask(r)) {
