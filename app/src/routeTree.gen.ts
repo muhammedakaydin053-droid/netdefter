@@ -16,6 +16,7 @@ import { Route as DenemelerRouteImport } from './routes/denemeler'
 import { Route as GunlukRouteImport } from './routes/gunluk'
 import { Route as IstatistiklerRouteImport } from './routes/istatistikler'
 import { Route as KonularRouteImport } from './routes/konular'
+import { Route as NotlarRouteImport } from './routes/notlar'
 import { Route as ProgramRouteImport } from './routes/program'
 import { Route as TekrarlarRouteImport } from './routes/tekrarlar'
 import { Route as YanlislarRouteImport } from './routes/yanlislar'
@@ -55,6 +56,11 @@ const KonularRoute = KonularRouteImport.update({
   path: '/konular',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NotlarRoute = NotlarRouteImport.update({
+  id: '/notlar',
+  path: '/notlar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProgramRoute = ProgramRouteImport.update({
   id: '/program',
   path: '/program',
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/gunluk': typeof GunlukRoute
   '/istatistikler': typeof IstatistiklerRoute
   '/konular': typeof KonularRoute
+  '/notlar': typeof NotlarRoute
   '/program': typeof ProgramRoute
   '/tekrarlar': typeof TekrarlarRoute
   '/yanlislar': typeof YanlislarRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/gunluk': typeof GunlukRoute
   '/istatistikler': typeof IstatistiklerRoute
   '/konular': typeof KonularRoute
+  '/notlar': typeof NotlarRoute
   '/program': typeof ProgramRoute
   '/tekrarlar': typeof TekrarlarRoute
   '/yanlislar': typeof YanlislarRoute
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/gunluk': typeof GunlukRoute
   '/istatistikler': typeof IstatistiklerRoute
   '/konular': typeof KonularRoute
+  '/notlar': typeof NotlarRoute
   '/program': typeof ProgramRoute
   '/tekrarlar': typeof TekrarlarRoute
   '/yanlislar': typeof YanlislarRoute
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
     | '/gunluk'
     | '/istatistikler'
     | '/konular'
+    | '/notlar'
     | '/program'
     | '/tekrarlar'
     | '/yanlislar'
@@ -130,6 +140,7 @@ export interface FileRouteTypes {
     | '/gunluk'
     | '/istatistikler'
     | '/konular'
+    | '/notlar'
     | '/program'
     | '/tekrarlar'
     | '/yanlislar'
@@ -142,6 +153,7 @@ export interface FileRouteTypes {
     | '/gunluk'
     | '/istatistikler'
     | '/konular'
+    | '/notlar'
     | '/program'
     | '/tekrarlar'
     | '/yanlislar'
@@ -155,6 +167,7 @@ export interface RootRouteChildren {
   GunlukRoute: typeof GunlukRoute
   IstatistiklerRoute: typeof IstatistiklerRoute
   KonularRoute: typeof KonularRoute
+  NotlarRoute: typeof NotlarRoute
   ProgramRoute: typeof ProgramRoute
   TekrarlarRoute: typeof TekrarlarRoute
   YanlislarRoute: typeof YanlislarRoute
@@ -211,6 +224,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KonularRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/notlar': {
+      id: '/notlar'
+      path: '/notlar'
+      fullPath: '/notlar'
+      preLoaderRoute: typeof NotlarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/program': {
       id: '/program'
       path: '/program'
@@ -243,6 +263,7 @@ const rootRouteChildren: RootRouteChildren = {
   GunlukRoute: GunlukRoute,
   IstatistiklerRoute: IstatistiklerRoute,
   KonularRoute: KonularRoute,
+  NotlarRoute: NotlarRoute,
   ProgramRoute: ProgramRoute,
   TekrarlarRoute: TekrarlarRoute,
   YanlislarRoute: YanlislarRoute,
