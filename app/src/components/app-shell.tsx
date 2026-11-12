@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   LineChart,
   Moon,
+  NotebookPen,
   RotateCcw,
   Sun,
   Table2,
@@ -31,6 +32,7 @@ const NAV = [
   { to: "/dagilim", label: "Dağılım", icon: Table2 },
   { to: "/gunluk", label: "Günlük", icon: CalendarDays },
   { to: "/arsiv", label: "Arşiv", icon: Archive },
+  { to: "/notlar", label: "Notlarım", icon: NotebookPen },
 ] as const;
 
 function readTheme(): "light" | "dark" {
