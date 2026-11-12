@@ -71,10 +71,10 @@ function isSameRecord(a: Note, b: Note): boolean {
   );
 }
 
-/** Yeni not nesnesi (henüz yazılmadı). */
-export async function buildNote(input: NoteInput): Promise<Note> {
+/** Yeni not nesnesi (henüz yazılmadı). `id` verilmezse yeni UUID üretilir. */
+export async function buildNote(input: NoteInput, id: string = newId()): Promise<Note> {
   const base = {
-    id: newId(),
+    id,
     title: input.title,
     exam: input.exam,
     subject: input.subject,

@@ -123,3 +123,33 @@ export function validateTiptapDoc(doc: unknown): DocIssue[] {
 export function emptyDoc(): { type: "doc"; content: unknown[] } {
   return { type: "doc", content: [{ type: "paragraph" }] };
 }
+
+/**
+ * İçerik ağacındaki `imageRef` düğümlerinin `imageId` attribute'unu `idMap`
+ * ile yeniden eşler (içe aktarmada görseller yeni kimlik aldığı için şarttır;
+ * aksi hâlde gövdeye gömülü görseller eski, artık var olmayan kimliğe işaret
+ * eder ve editörde sonsuza kadar "yükleniyor" durumunda kalır).
+ *
+ * Eşlenemeyen `imageRef` düğümleri düşürülür (haritada karşılığı olmayan görsel
+ * içe alınmamıştır). Girdi değiştirilmez; yeni bir ağaç döner.
+ */
+export function remapImageRefIds(doc: unknown, idMap: Map<string, string>): unknown {
+  if (!doc || typeof doc !== "object") return doc;
+  const node = doc as { type?: unknown; attrs?: Record<string, unknown>; content?: unknown[] };
+
+  if (node.type === "imageRef") {
+    const oldId = typeof node.attrs?.imageId === "string" ? (node.attrs.imageId as string) : "";
+    const newId = idMap.get(oldId);
+    if (!newId) return null;
+    return { ...node, attrs: { ...node.attrs, imageId: newId } };
+  }
+
+  if (Array.isArray(node.content)) {
+    const mapped = node.content
+      .map((child) => remapImageRefIds(child, idMap))
+      .filter((child) => child !== null);
+    return { ...node, content: mapped };
+  }
+
+  return node;
+}

@@ -34,6 +34,11 @@ export interface NotesState {
   togglePinned: (id: string) => Promise<void>;
   toggleArchived: (id: string) => Promise<void>;
 
+  /** Çakışma: yerel değişiklikleri koru (DB sürümü arşiv kopyası olur). */
+  resolveKeepLocal: (local: Note) => Promise<{ status: string; revision?: number }>;
+  /** Çakışma: veritabanındaki sürümü yükle (yerel arşiv kopyası olur). */
+  resolveKeepDb: (local: Note) => Promise<{ status: string }>;
+
   refreshImages: () => Promise<void>;
 }
 
@@ -112,6 +117,21 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     if (!n) return;
     await repo.saveNote({ ...n, archived: !n.archived }, n.revision);
     await get().hydrate();
+  },
+
+  // Not: yalnızca BAŞARIDA hydrate edilir. `missing`/`error` durumunda
+  // hydrate, silinmiş notu listeden düşürüp editörü unmount ettirir ve
+  // kullanıcının yerel içeriğiyle çakışma banner'ı kaybolurdu.
+  resolveKeepLocal: async (local) => {
+    const res = await repo.resolveConflictKeepLocal(local);
+    if (res.status === "written") await get().hydrate();
+    return res;
+  },
+
+  resolveKeepDb: async (local) => {
+    const res = await repo.resolveConflictKeepDb(local);
+    if (res.status === "written") await get().hydrate();
+    return res;
   },
 
   refreshImages: async () => {

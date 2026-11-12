@@ -3,7 +3,7 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { Autosave } from "./autosave.ts";
+import { Autosave, attachLifecycleFlush } from "./autosave.ts";
 
 function delay(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -74,5 +74,121 @@ describe("Autosave", () => {
     a.schedule();
     await delay(60);
     assert.equal(calls, 1);
+  });
+});
+
+describe("attachLifecycleFlush — sekme yaşam döngüsü (O1)", () => {
+  function makeTarget() {
+    const listeners = new Map<string, Set<() => void>>();
+    return {
+      addEventListener: (t: string, fn: () => void) => {
+        if (!listeners.has(t)) listeners.set(t, new Set());
+        listeners.get(t)!.add(fn);
+      },
+      removeEventListener: (t: string, fn: () => void) => {
+        listeners.get(t)?.delete(fn);
+      },
+      dispatch: (t: string) => {
+        for (const fn of listeners.get(t) ?? []) fn();
+      },
+      count: (t: string) => listeners.get(t)?.size ?? 0,
+    };
+  }
+
+  it("sekme gizlenince bekleyen yazmayı flush eder", async () => {
+    const doc = makeTarget();
+    const win = makeTarget();
+    (globalThis as any).document = { visibilityState: "hidden", ...doc };
+    (globalThis as any).window = win;
+    try {
+      let calls = 0;
+      const a = new Autosave({
+        delayMs: 10000,
+        save: async () => {
+          calls++;
+          return { status: "written" };
+        },
+      });
+      const detach = attachLifecycleFlush(a);
+      a.schedule(); // debounce'u kur, hemen yazma
+      doc.dispatch("visibilitychange");
+      await a.idle();
+      assert.equal(calls, 1, "gizlenince hemen yazılmalı");
+      detach();
+    } finally {
+      delete (globalThis as any).document;
+      delete (globalThis as any).window;
+    }
+  });
+
+  it("sekme görünürken flush TETİKLENMEZ", async () => {
+    const doc = makeTarget();
+    const win = makeTarget();
+    (globalThis as any).document = { visibilityState: "visible", ...doc };
+    (globalThis as any).window = win;
+    try {
+      let calls = 0;
+      const a = new Autosave({
+        delayMs: 10000,
+        save: async () => {
+          calls++;
+          return { status: "written" };
+        },
+      });
+      const detach = attachLifecycleFlush(a);
+      a.schedule();
+      doc.dispatch("visibilitychange");
+      await a.idle();
+      assert.equal(calls, 0, "görünürken yazma olmamalı");
+      detach();
+    } finally {
+      delete (globalThis as any).document;
+      delete (globalThis as any).window;
+    }
+  });
+
+  it("pagehide bekleyen yazmayı flush eder", async () => {
+    const doc = makeTarget();
+    const win = makeTarget();
+    (globalThis as any).document = { visibilityState: "visible", ...doc };
+    (globalThis as any).window = win;
+    try {
+      let calls = 0;
+      const a = new Autosave({
+        delayMs: 10000,
+        save: async () => {
+          calls++;
+          return { status: "written" };
+        },
+      });
+      const detach = attachLifecycleFlush(a);
+      a.schedule();
+      win.dispatch("pagehide");
+      await a.idle();
+      assert.equal(calls, 1, "pagehide'da yazılmalı");
+      detach();
+    } finally {
+      delete (globalThis as any).document;
+      delete (globalThis as any).window;
+    }
+  });
+
+  it("detach sonrası dinleyiciler kaldırılır (bellek sızıntısı yok)", () => {
+    const doc = makeTarget();
+    const win = makeTarget();
+    (globalThis as any).document = { visibilityState: "visible", ...doc };
+    (globalThis as any).window = win;
+    try {
+      const a = new Autosave({ delayMs: 10, save: async () => ({ status: "written" }) });
+      const detach = attachLifecycleFlush(a);
+      assert.equal(doc.count("visibilitychange"), 1);
+      assert.equal(win.count("pagehide"), 1);
+      detach();
+      assert.equal(doc.count("visibilitychange"), 0);
+      assert.equal(win.count("pagehide"), 0);
+    } finally {
+      delete (globalThis as any).document;
+      delete (globalThis as any).window;
+    }
   });
 });

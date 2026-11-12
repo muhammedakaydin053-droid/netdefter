@@ -93,3 +93,43 @@ export class Autosave {
     this.timer = null;
   }
 }
+
+/**
+ * Tarayıcı yaşam döngüsünde autosave kurtarma.
+ *
+ * Sekme gizlenince/gizliyken (`visibilitychange`) ve sayfa terk edilirken
+ * (`pagehide`) bekleyen debounce'u flush etmeyi dener.
+ *
+ * SINIR: `pagehide`/`visibilitychange` sırasında tarayıcı IndexedDB yazmasının
+ * tamamlanacağını GARANTİ ETMEZ — sayfa her an dondurulabilir. Bu yüzden
+ * burada "kaydedildi" garantisi verilmez; yalnızca en iyi çaba gösterilir.
+ * Kalıcı güvence için düzenli (debounce) yazma akışı esastır.
+ *
+ * @returns temizleme fonksiyonu (dinleyicileri kaldırır)
+ */
+export function attachLifecycleFlush(autosave: Autosave): () => void {
+  const onHidden = () => {
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      void autosave.flush();
+    }
+  };
+  const onPageHide = () => {
+    void autosave.flush();
+  };
+
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", onHidden);
+  }
+  if (typeof window !== "undefined") {
+    window.addEventListener("pagehide", onPageHide);
+  }
+
+  return () => {
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", onHidden);
+    }
+    if (typeof window !== "undefined") {
+      window.removeEventListener("pagehide", onPageHide);
+    }
+  };
+}

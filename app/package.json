@@ -16,7 +16,8 @@
     "check:auth": "node scripts/check-auth-invariant.mjs",
     "archive": "node scripts/build-archive.mjs",
     "archive:check": "node scripts/build-archive.mjs --check",
-    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/data/timeline.test.ts src/data/program-start.test.ts src/lib/smart/budget.test.ts src/lib/smart/progress.test.ts src/lib/smart/explain.test.ts src/lib/smart/validation.test.ts src/lib/smart/mock-bands.test.ts src/data/references.test.ts src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts src/lib/store.merge.test.ts src/lib/store.migrate.test.ts src/lib/backup.test.ts src/lib/smart/wrong-analysis.test.ts",
+    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/data/timeline.test.ts src/data/program-start.test.ts src/lib/smart/budget.test.ts src/lib/smart/progress.test.ts src/lib/smart/explain.test.ts src/lib/smart/validation.test.ts src/lib/smart/mock-bands.test.ts src/data/references.test.ts src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts src/lib/store.merge.test.ts src/lib/store.migrate.test.ts src/lib/backup.test.ts src/lib/smart/wrong-analysis.test.ts && npm run test:notes",
+    "test:notes": "node --experimental-strip-types --test src/lib/notes/*.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "test:plan": "node --experimental-strip-types --test src/lib/smart/engine.plan.test.ts src/lib/smart/mock-model.test.ts src/lib/smart/program-simulation.test.ts"

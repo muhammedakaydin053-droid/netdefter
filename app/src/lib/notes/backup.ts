@@ -89,6 +89,8 @@ function isNoteShape(v: unknown): v is Note {
     (v.exam === "TYT" || v.exam === "AYT") &&
     typeof v.subject === "string" &&
     Array.isArray(v.topics) &&
+    Array.isArray(v.imageIds) &&
+    Array.isArray(v.tags) &&
     isObject(v.content)
   );
 }

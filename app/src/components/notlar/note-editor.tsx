@@ -12,7 +12,13 @@ import Highlight from "@tiptap/extension-highlight";
 import Placeholder from "@tiptap/extension-placeholder";
 import type { JSONContent } from "@tiptap/core";
 import { useNotesStore } from "@/lib/notes/store";
-import { Autosave, type SaveState } from "@/lib/notes/autosave";
+import { Autosave, attachLifecycleFlush, type SaveState } from "@/lib/notes/autosave";
+import {
+  resolveConflictUi,
+  createSingleFlight,
+  guardedSave,
+  CONFLICT_ERROR_MESSAGE,
+} from "@/lib/notes/conflict";
 import { ImageRef } from "@/lib/notes/image-ref-node";
 import { createImage } from "@/lib/notes/images";
 import { emptyDoc } from "@/lib/notes/schema";
@@ -36,6 +42,8 @@ const SAVE_LABEL: Record<SaveState, string> = {
 export function NoteEditor({ note }: { note: Note }) {
   const update = useNotesStore((s) => s.update);
   const refreshImages = useNotesStore((s) => s.refreshImages);
+  const resolveKeepLocal = useNotesStore((s) => s.resolveKeepLocal);
+  const resolveKeepDb = useNotesStore((s) => s.resolveKeepDb);
 
   const [title, setTitle] = useState(note.title);
   const [exam, setExam] = useState<Exam>(note.exam);
@@ -43,6 +51,15 @@ export function NoteEditor({ note }: { note: Note }) {
   const [topic, setTopic] = useState(note.topics[0] ?? "");
   const [tags, setTags] = useState<NoteTag[]>(note.tags);
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [conflictMessage, setConflictMessage] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
+
+  // Çakışma çözümü sürerken iki butonun da tekrar çalışmasını engeller.
+  const conflictLock = useRef(createSingleFlight()).current;
+
+  // `missing` sonrası autosave kilidi: silinen not kendiliğinden yeniden
+  // oluşmasın diye save() bu bayrak açıkken yazmaz (durumu "conflict" tutar).
+  const autosaveBlockedRef = useRef(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -54,27 +71,127 @@ export function NoteEditor({ note }: { note: Note }) {
     () =>
       new Autosave({
         delayMs: 500,
-        save: async () => {
-          const d = draftRef.current;
-          const current = useNotesStore.getState().notes.find((n) => n.id === note.id);
-          if (!current) return { status: "missing" };
-          const res = await update({
-            ...current,
-            title: d.title,
-            exam: d.exam,
-            subject: d.subject,
-            topics: d.topic ? [d.topic] : [],
-            tags: d.tags,
-            content: d.content as Note["content"],
-          });
-          return res;
-        },
+        save: guardedSave(
+          () => autosaveBlockedRef.current,
+          async () => {
+            const d = draftRef.current;
+            const current = useNotesStore.getState().notes.find((n) => n.id === note.id);
+            if (!current) return { status: "missing" };
+            const res = await update({
+              ...current,
+              title: d.title,
+              exam: d.exam,
+              subject: d.subject,
+              topics: d.topic ? [d.topic] : [],
+              tags: d.tags,
+              content: d.content as Note["content"],
+            });
+            return res;
+          },
+        ),
         onState: setSaveState,
       }),
     [note.id, update],
   );
 
-  useEffect(() => () => autosave.dispose(), [autosave]);
+  useEffect(() => {
+    const detach = attachLifecycleFlush(autosave);
+    return detach;
+  }, [autosave]);
+
+  useEffect(
+    () => () => {
+      // Unmount'ta bekleyen yazmayı dene. Bu bir "garanti" değildir:
+      // IndexedDB yazması sayfa donmadan önce bitmeyebilir (bkz. autosave.ts).
+      void autosave.flush();
+      autosave.dispose();
+    },
+    [autosave],
+  );
+
+  // Çakışma anında kullanıcının karar vermesi için yerel taslağı üretir.
+  function buildLocalDraft(): Note | null {
+    const current = useNotesStore.getState().notes.find((n) => n.id === note.id);
+    if (!current) return null;
+    const d = draftRef.current;
+    return {
+      ...current,
+      title: d.title,
+      exam: d.exam,
+      subject: d.subject,
+      topics: d.topic ? [d.topic] : [],
+      tags: d.tags,
+      content: d.content as Note["content"],
+    };
+  }
+
+  /** Editörü verilen kaydın içeriğiyle senkronlar (yerel taslağı günceller). */
+  function syncEditorTo(record: Note) {
+    setTitle(record.title);
+    setExam(record.exam);
+    setSubject(record.subject);
+    setTopic(record.topics[0] ?? "");
+    setTags(record.tags);
+    draftRef.current = {
+      title: record.title,
+      exam: record.exam,
+      subject: record.subject,
+      topic: record.topics[0] ?? "",
+      tags: record.tags,
+      content: record.content,
+    };
+    editor?.commands.setContent((record.content as JSONContent) ?? emptyDoc());
+  }
+
+  /**
+   * Çakışma çözümünü çalıştırır: bekleyen autosave'i durdurur, sonucu
+   * `resolveConflictUi` ile yorumlar. Başarıda editörü senkronlar ve banner'ı
+   * kaldırır; `error`/`missing`/bilinmeyen durumda banner'ı KORUR.
+   */
+  async function runConflictResolution(
+    resolve: (local: Note) => Promise<{ status: string }>,
+  ): Promise<void> {
+    await conflictLock.run(async () => {
+      setResolving(true);
+      setConflictMessage(null);
+      try {
+        const local = buildLocalDraft();
+        if (!local) {
+          setConflictMessage(CONFLICT_ERROR_MESSAGE);
+          return;
+        }
+        // Eski revision ile yarışmasın: bekleyen debounce'u iptal et,
+        // yürüyen yazmayı bekle (çözüm doğrudan repository'ye yazar).
+        autosave.dispose();
+        await autosave.idle();
+
+        const res = await resolve(local);
+        const current = useNotesStore.getState().notes.find((n) => n.id === note.id);
+        const decision = resolveConflictUi(res.status, current);
+        if (decision.action === "synced") {
+          autosaveBlockedRef.current = false;
+          syncEditorTo(decision.note);
+          setSaveState("idle");
+        } else {
+          // `missing`: silinen not kendiliğinden yeniden oluşmasın diye kilitle.
+          autosaveBlockedRef.current = decision.blockAutosave;
+          setConflictMessage(decision.message);
+        }
+      } catch {
+        setConflictMessage(CONFLICT_ERROR_MESSAGE);
+      } finally {
+        setResolving(false);
+      }
+    });
+  }
+
+  function onConflictKeepLocal() {
+    return runConflictResolution((local) => resolveKeepLocal(local));
+  }
+
+  function onConflictKeepDb() {
+    return runConflictResolution((local) => resolveKeepDb(local));
+  }
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -160,6 +277,40 @@ export function NoteEditor({ note }: { note: Note }) {
           {SAVE_LABEL[saveState]}
         </span>
       </div>
+
+      {saveState === "conflict" ? (
+        <div
+          role="alert"
+          className="flex flex-col gap-2 border-b border-border bg-bad-bg px-3 py-2 text-xs text-bad"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex-1">
+              Bu not başka bir sekmede değiştirilmiş. Ne yapmak istersiniz?
+            </span>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={resolving}
+              onClick={() => void onConflictKeepLocal()}
+            >
+              Yerel değişikliklerimi koru
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={resolving}
+              onClick={() => void onConflictKeepDb()}
+            >
+              Veritabanındaki sürümü yükle
+            </Button>
+          </div>
+          {conflictMessage ? (
+            <p role="status" className="text-bad">
+              {conflictMessage}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-xs">
         <select
