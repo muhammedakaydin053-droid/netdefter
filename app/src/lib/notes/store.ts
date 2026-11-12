@@ -77,9 +77,12 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     return note;
   },
 
+  // Not: `missing`/`error` durumunda hydrate EDİLMEZ. Aksi hâlde silinmiş not
+  // listeden düşer, editör unmount olur ve kullanıcının yerel içeriğiyle
+  // çakışma banner'ı kaybolurdu (bkz. resolveKeepLocal notu).
   update: async (note) => {
     const res = await repo.saveNote(note, note.revision);
-    await get().hydrate();
+    if (res.status !== "missing" && res.status !== "error") await get().hydrate();
     return res;
   },
 

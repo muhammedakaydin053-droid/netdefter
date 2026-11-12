@@ -208,4 +208,32 @@ describe("notes store — missing sonrası otomatik yeniden oluşturma engeli", 
     assert.equal(res.status, "written");
     assert.equal((await repo.getNote(note.id))?.title, "yazılan");
   });
+
+  // H1: stale sekme, not başka sekmede kalıcı silindikten SONRA yazarsa
+  // `store.update` `missing` döner ve kayıt yeniden OLUŞMAZ. (Daha önce
+  // `saveNote` `expectedRevision` verilse bile yeni kayıt yaratıyordu.)
+  it("H1: kalıcı silinmiş nota yazma → missing, not dirilmez", async () => {
+    const { note } = await repo.createNote(baseInput());
+    await store.useNotesStore.getState().hydrate();
+
+    await repo.purgeNote(note.id);
+
+    const stale = { ...note };
+    const res = await store.useNotesStore.getState().update(stale);
+    assert.equal(res.status, "missing");
+    assert.equal((await repo.listNotes()).length, 0, "silinen not dirilmemeli");
+  });
+
+  it("H1: missing sonrası store silinen notu hâlâ listede tutar (banner için)", async () => {
+    const { note } = await repo.createNote(baseInput());
+    await store.useNotesStore.getState().hydrate();
+    await repo.purgeNote(note.id);
+
+    await store.useNotesStore.getState().update({ ...note });
+    // hydrate edilmediği için not listede kalır → editör unmount olmaz.
+    assert.ok(
+      store.useNotesStore.getState().notes.some((n: any) => n.id === note.id),
+      "missing sonrası not listede kalmalı (editör korunur)",
+    );
+  });
 });

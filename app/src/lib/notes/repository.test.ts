@@ -117,6 +117,27 @@ describe("repository — temel CRUD", () => {
     const r = await repo.saveNote({ ...note, title: "x" }, note.revision + 5);
     assert.equal(r.status, "conflict");
   });
+
+  it("expectedRevision verilmiş ama kayıt yoksa 'missing' döner, YENİDEN OLUŞTURMAZ (H1)", async () => {
+    const { note } = await repo.createNote(baseInput());
+    // Başka bir sekme notu kalıcı olarak sildi.
+    await repo.purgeNote(note.id);
+
+    // Bu sekme hâlâ eski revision ile güncelleme deniyor.
+    const r = await repo.saveNote({ ...note, title: "diriltme denemesi" }, note.revision);
+    assert.equal(r.status, "missing", "güncelleme yolu silinen notu diriltmemeli");
+    assert.equal(await repo.getNote(note.id), undefined, "kayıt oluşmamalı");
+    assert.equal((await repo.listNotes()).length, 0, "hiç not kalmamalı");
+  });
+
+  it("expectedRevision verilmemişse yeni kayıt oluşturur (upsert korunur)", async () => {
+    const { note } = await repo.createNote(baseInput());
+    await repo.purgeNote(note.id);
+    // create/upsert yolu (expectedRevision yok) hâlâ yazabilir.
+    const r = await repo.saveNote({ ...note, title: "upsert" });
+    assert.equal(r.status, "written");
+    assert.equal((await repo.getNote(note.id))?.title, "upsert");
+  });
 });
 
 describe("repository — soft delete / restore / purge", () => {

@@ -21,7 +21,7 @@ import {
 } from "@/lib/notes/conflict";
 import { ImageRef } from "@/lib/notes/image-ref-node";
 import { createImage } from "@/lib/notes/images";
-import { emptyDoc } from "@/lib/notes/schema";
+import { emptyDoc, removeImageRefs } from "@/lib/notes/schema";
 import { subjectsFor, topicsFor } from "@/lib/notes/curriculum";
 import type { Exam, Note, NoteTag } from "@/lib/notes/types";
 import { NOTE_TAGS } from "@/lib/notes/types";
@@ -86,6 +86,9 @@ export function NoteEditor({ note }: { note: Note }) {
               tags: d.tags,
               content: d.content as Note["content"],
             });
+            // `missing`: not başka sekmede kalıcı silinmiş. Çakışma banner'ını
+            // aç ki kullanıcı bilinçli karar versin; not sessizce dirilmesin.
+            if (res.status === "missing") return { status: "conflict" };
             return res;
           },
         ),
@@ -260,6 +263,32 @@ export function NoteEditor({ note }: { note: Note }) {
     [note.id, editor, update, refreshImages, autosave],
   );
 
+  // Görsel silinince editör içeriğindeki `imageRef` düğümlerini de kaldır
+  // (aksi hâlde düğüm "Görsel yükleniyor…" olarak takılı kalır). Diğer
+  // görsellerin referanslarına dokunulmaz. Not güncellemesi TEK atomik yazma;
+  // kaydedilmemiş düzenlemeler kaybolmasın diye güncel taslak (draft) esas alınır.
+  const onImageDeleted = useCallback(
+    async (imageId: string): Promise<{ status: string }> => {
+      const current = useNotesStore.getState().notes.find((n) => n.id === note.id);
+      if (!current) return { status: "missing" };
+      const d = draftRef.current;
+      const nextContent = removeImageRefs(d.content, new Set([imageId])) as Note["content"];
+      draftRef.current.content = nextContent;
+      editor?.commands.setContent(nextContent as JSONContent, { emitUpdate: false });
+      return update({
+        ...current,
+        title: d.title,
+        exam: d.exam,
+        subject: d.subject,
+        topics: d.topic ? [d.topic] : [],
+        tags: d.tags,
+        imageIds: current.imageIds.filter((x) => x !== imageId),
+        content: nextContent,
+      });
+    },
+    [note.id, editor, update],
+  );
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
@@ -393,7 +422,7 @@ export function NoteEditor({ note }: { note: Note }) {
         <EditorContent editor={editor} />
       </div>
 
-      <ImageGallery note={note} />
+      <ImageGallery note={note} onDeleted={onImageDeleted} />
     </div>
   );
 }
