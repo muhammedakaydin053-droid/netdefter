@@ -153,3 +153,27 @@ export function remapImageRefIds(doc: unknown, idMap: Map<string, string>): unkn
 
   return node;
 }
+
+/**
+ * İçerik ağacından belirtilen `imageId`'lere ait `imageRef` düğümlerini
+ * çıkarır (görsel silindiğinde artık referans kalmasın diye). Diğer
+ * görsellerin referanslarına DOKUNMAZ. Girdi değiştirilmez; yeni ağaç döner.
+ */
+export function removeImageRefs(doc: unknown, idsToRemove: Set<string>): unknown {
+  if (!doc || typeof doc !== "object") return doc;
+  const node = doc as { type?: unknown; attrs?: Record<string, unknown>; content?: unknown[] };
+
+  if (node.type === "imageRef") {
+    const id = typeof node.attrs?.imageId === "string" ? (node.attrs.imageId as string) : "";
+    return idsToRemove.has(id) ? null : node;
+  }
+
+  if (Array.isArray(node.content)) {
+    const kept = node.content
+      .map((child) => removeImageRefs(child, idsToRemove))
+      .filter((child) => child !== null);
+    return { ...node, content: kept };
+  }
+
+  return node;
+}

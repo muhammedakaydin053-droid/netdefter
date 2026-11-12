@@ -46,15 +46,21 @@ function Thumb({ image, onOpen }: { image: NoteImage; onOpen: () => void }) {
   );
 }
 
-export function ImageGallery({ note }: { note: Note }) {
+export function ImageGallery({ note, onDeleted }: { note: Note; onDeleted: (imageId: string) => Promise<{ status: string }> }) {
   const allImages = useNotesStore((s) => s.images);
   const refreshImages = useNotesStore((s) => s.refreshImages);
-  const update = useNotesStore((s) => s.update);
   const [openId, setOpenId] = useState<string | null>(null);
   const [openUrl, setOpenUrl] = useState<string | null>(null);
   const [captionDraft, setCaptionDraft] = useState("");
 
   const images = allImages.filter((i) => note.imageIds.includes(i.id));
+
+  // Açık görselin açıklaması. `images` her render'da yeni bir dizi olduğu için
+  // efektin bağımlılığı DİZİ değil, ilkel `openCaption` değeri olmalı; aksi
+  // hâlde kullanıcı yazarken efekt her render'da çalışıp taslağı sıfırlıyordu.
+  const openImage = openId ? images.find((i) => i.id === openId) : undefined;
+  const openCaption = openImage?.caption ?? null;
+  const openRevision = openImage?.revision;
 
   useEffect(() => {
     if (!openId) {
@@ -75,24 +81,26 @@ export function ImageGallery({ note }: { note: Note }) {
   }, [openId]);
 
   useEffect(() => {
-    const img = images.find((i) => i.id === openId);
-    setCaptionDraft(img?.caption ?? "");
-  }, [openId, images]);
+    setCaptionDraft(openCaption ?? "");
+  }, [openId, openCaption]);
 
   if (images.length === 0) return null;
 
   async function onDelete(id: string) {
+    // Önce notu güncelle (imageIds + içerikten imageRef kaldırma) — TEK atomik
+    // yazma. Başarısızsa blob'a DOKUNMA: veri bütünlüğü bozulmaz. Başarılıysa
+    // görsel blob'unu sil. Böylece asla "içerikte duran ama verisi olmayan"
+    // ya da "verisi olan ama notta referansı kalmayan" durum oluşmaz.
+    const res = await onDeleted(id);
+    if (res.status !== "written") return;
     await deleteImage(id);
-    const current = useNotesStore.getState().notes.find((n) => n.id === note.id);
-    if (current) await update({ ...current, imageIds: current.imageIds.filter((x) => x !== id) });
     await refreshImages();
     setOpenId(null);
   }
 
   async function onSaveCaption() {
-    const img = images.find((i) => i.id === openId);
-    if (!img) return;
-    await updateImageMeta(img.id, { caption: captionDraft || null }, img.revision);
+    if (!openImage) return;
+    await updateImageMeta(openImage.id, { caption: captionDraft || null }, openRevision ?? openImage.revision);
     await refreshImages();
     setOpenId(null);
   }

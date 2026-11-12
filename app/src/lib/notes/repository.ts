@@ -118,10 +118,20 @@ export async function saveNote(
   try {
     const current = await store.get(note.id);
 
-    if (expectedRevision !== undefined && current && current.revision !== expectedRevision) {
-      await tx.done;
-      settled = true;
-      return { status: "conflict", dbRevision: current.revision };
+    if (expectedRevision !== undefined) {
+      // GÜNCELLEME yolu: kayıt artık yoksa (ör. başka sekmede kalıcı silindi)
+      // yeni kayıt OLUŞTURMA. `missing` bildir; hiçbir şey yazılmaz. Böylece
+      // silinen not yarış durumunda kendiliğinden geri gelmez.
+      if (!current) {
+        await tx.done;
+        settled = true;
+        return { status: "missing" };
+      }
+      if (current.revision !== expectedRevision) {
+        await tx.done;
+        settled = true;
+        return { status: "conflict", dbRevision: current.revision };
+      }
     }
     // "identical" yalnızca içerik VE tüm meta alanları aynıysa; aksi hâlde
     // soft delete / favori / arşiv gibi meta değişiklikleri yazılmazdı.
