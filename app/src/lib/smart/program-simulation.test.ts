@@ -1,5 +1,5 @@
 /**
- * Tam dönem simülasyonu — 11.11.2026 → 20.06.2027.
+ * Tam dönem simülasyonu — 13.11.2026 → 20.06.2027.
  *
  * İki senaryo gerçek uygulama çağrısıyla (program.tsx biçimi) işletilir:
  *   1) hiç deneme/yanlış verisi yok,
@@ -480,7 +480,7 @@ describe("TYT–AYT tam deneme dengesi (sonuç kaydından bağımsız)", () => {
 // devreye girer; ikinci dönem round1Done ile, üçüncü dönem her iki koşulla da
 // kapsanır.
 const PERIODS = [
-  { id: "P1", label: "11.11.2026–05.02.2027 (2:1 fazı)", from: "2026-11-11", to: "2027-02-05", rule: "2:1" as const },
+  { id: "P1", label: "13.11.2026–05.02.2027 (2:1 fazı)", from: "2026-11-13", to: "2027-02-05", rule: "2:1" as const },
   { id: "P2", label: "06.02.2027–20.04.2027 (round1 sonrası 1:1)", from: "2027-02-06", to: "2027-04-20", rule: "1:1" as const },
   { id: "P3", label: "21.04.2027–20.06.2027 (son 60 gün 1:1)", from: "2027-04-21", to: "2027-06-20", rule: "1:1" as const },
 ];

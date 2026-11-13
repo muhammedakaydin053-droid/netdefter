@@ -1,7 +1,7 @@
 /**
  * Program başlangıç tarihi ve hedef/sınav çapaları — regresyon testleri.
  *
- * Program başlangıcı 10.11.2026 Salı'dan 11.11.2026 Çarşamba'ya alındı. Bu
+ * Program başlangıcı 11.11.2026 Çarşamba'dan 13.11.2026 Cuma'ya alındı. Bu
  * dosya, tarih kaydırmasının yalnızca başlangıcı değiştirdiğini; sınav
  * tarihlerinin, tur hedeflerinin, kapasite basamaklarının ve AYT ön koşul
  * kapılarının DEĞİŞMEDİĞİNİ kilitler.
@@ -33,11 +33,11 @@ after(async () => {
 });
 
 describe("program başlangıcı — yeni tarih", () => {
-  it("varsayılan program başlangıcı 11.11.2026 (Çarşamba)", () => {
-    assert.equal(TYPES.DEFAULT_SETTINGS.programStart, "2026-11-11");
-    assert.equal(TARGETS.programStart, "2026-11-11");
-    // 11.11.2026 Çarşamba olmalı (gün indeksi 3).
-    assert.equal(new Date("2026-11-11T12:00:00").getDay(), 3);
+  it("varsayılan program başlangıcı 13.11.2026 (Cuma)", () => {
+    assert.equal(TYPES.DEFAULT_SETTINGS.programStart, "2026-11-13");
+    assert.equal(TARGETS.programStart, "2026-11-13");
+    // 13.11.2026 Cuma olmalı (gün indeksi 5).
+    assert.equal(new Date("2026-11-13T12:00:00").getDay(), 5);
   });
 
   it("sınav tarihleri DEĞİŞMEDİ", () => {
@@ -67,7 +67,7 @@ describe("planlama kuralları — tarih kaydırmasında değişmedi", () => {
       { from: "2026-12-01", minutes: 390 },
       { from: "2027-01-01", minutes: 480 },
     ]);
-    assert.equal(BUDGET.dailyCapacity("2026-11-11"), 330);
+    assert.equal(BUDGET.dailyCapacity("2026-11-13"), 330);
     assert.equal(BUDGET.dailyCapacity("2026-11-30"), 330);
     assert.equal(BUDGET.dailyCapacity("2026-12-01"), 390);
     assert.equal(BUDGET.dailyCapacity("2027-01-01"), 480);
@@ -82,13 +82,13 @@ describe("planlama kuralları — tarih kaydırmasında değişmedi", () => {
   });
 
   it("faz takvimi yeni başlangıçtan başlar ve hedef çapalara oturur", () => {
-    const tl = TIMELINE.buildTimeline("2026-11-11", "2027-06-19");
-    assert.equal(tl[0].from, "2026-11-11");
+    const tl = TIMELINE.buildTimeline("2026-11-13", "2027-06-19");
+    assert.equal(tl[0].from, "2026-11-13");
     assert.equal(tl.at(-1).to, "2027-06-19");
     // Sınırlar görünür hedef tarihlere çapalı (TYT 15.02.2027).
     assert.deepEqual(
       tl.map((p: any) => p.from),
-      ["2026-11-11", "2027-02-15", "2027-04-23", "2027-05-07", "2027-05-17"],
+      ["2026-11-13", "2027-02-15", "2027-04-23", "2027-05-07", "2027-05-17"],
     );
   });
 });

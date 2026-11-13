@@ -40,7 +40,7 @@ export interface Targets {
 }
 
 export const TARGETS: Targets = {
-  programStart: "2026-11-11",
+  programStart: "2026-11-13",
   tytRound1: "2027-02-15",
   // Motorun TYT tempo/faz penceresi bu iç çapaya göre kurulur. `tytRound1`'i
   // (ekran hedefi) 15.02'ye çekmek tek başına bitişi 23.02'ye kaydırıyordu;
