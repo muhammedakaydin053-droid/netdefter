@@ -268,7 +268,7 @@ describe("tamamlanmış konu ve pratik döngüsü", () => {
     // Regresyon: Bitti konular her gün "Soru çözümü" görevi alıp yeni konuların
     // slotlarını tüketiyordu.
     const topics = withStarted("Kimya Bilimi", "Bitti");
-    const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], "2026-11-11", new Set());
+    const { slots } = E.buildDailyPlan(topics, [], [], [], [], S, [], "2026-11-13", new Set());
     const practice = slots.find(
       (s: any) => s.topic === "Kimya Bilimi" && s.kind === "Soru çözümü",
     );
@@ -279,7 +279,7 @@ describe("tamamlanmış konu ve pratik döngüsü", () => {
 describe("kapasite eğrisi (330/390/480)", () => {
   it("artan kapasite günlük yeni konu sayısını artırır", () => {
     const cap = (d: string) => (d < "2026-12-01" ? 330 : d < "2027-01-01" ? 390 : 480);
-    const nov = E.planPace(seed(), { ...S, studyMinutes: cap("2026-11-11") }, "2026-11-11");
+    const nov = E.planPace(seed(), { ...S, studyMinutes: cap("2026-11-13") }, "2026-11-13");
     const jan = E.planPace(seed(), { ...S, studyMinutes: cap("2027-01-10") }, "2027-01-10");
     assert.ok(jan.perDay >= nov.perDay, `Ocak perDay ${jan.perDay} < Kasım ${nov.perDay}`);
     assert.ok(jan.capacity > nov.capacity, "Ocak kapasitesi Kasım'dan büyük olmalı");
@@ -1365,15 +1365,15 @@ describe("çoklu senaryo simülasyonu", () => {
  * GERÇEK UYGULAMA ENTEGRASYONU — dönem simülasyonu.
  *
  * `runApp` bloğu Mod B donmasını yalnızca ilk 30–120 günde doğruluyor. Bu blok
- * kullanıcının bildirdiği tam aralığı (11.11.2026 – 16.02.2027) gerçek ekran
+ * kullanıcının bildirdiği tam aralığı (13.11.2026 – 16.02.2027) gerçek ekran
  * çağrısıyla (9. argüman YOK) işletir ve şu sözleşmeleri kilitler:
- *   - 14.11.2026 sonrasında yeni konu üretimi devam eder,
+ *   - 16.11.2026 sonrasında yeni konu üretimi devam eder,
  *   - AYT Fizik aralık başında açılır, diğer AYT dersleri kendi kapılarında açılır,
  *   - 184 öğretilebilir konu öğrenilme koşullarıyla ilerler,
  *   - aynı anlatım görevi tekrar üretilmez,
  *   - pratik / tekrar / eksik kapatma görevleri üretilir.
  */
-describe("gerçek uygulama entegrasyonu (11.11.2026 – 16.02.2027)", () => {
+describe("gerçek uygulama entegrasyonu (13.11.2026 – 16.02.2027)", () => {
   const END = "2027-02-16";
 
   /** Gerçek çağrı biçimiyle dönemi işletir; günlük kayıtları toplar. */
@@ -1430,9 +1430,9 @@ describe("gerçek uygulama entegrasyonu (11.11.2026 – 16.02.2027)", () => {
   let R: ReturnType<typeof runPeriod>;
   before(() => { R = runPeriod(); });
 
-  it("14.11.2026 sonrasında yeni konu üretimi durmaz", () => {
-    const after = R.lectDates.filter((d) => d > "2026-11-14");
-    assert.ok(after.length >= 50, `14.11 sonrası anlatım günü çok az: ${after.length}`);
+  it("16.11.2026 sonrasında yeni konu üretimi durmaz", () => {
+    const after = R.lectDates.filter((d) => d > "2026-11-16");
+    assert.ok(after.length >= 50, `16.11 sonrası anlatım günü çok az: ${after.length}`);
     assert.ok(R.lectDates.includes(END), "dönemin son gününde de anlatım üretilmeli");
   });
 
@@ -1441,8 +1441,8 @@ describe("gerçek uygulama entegrasyonu (11.11.2026 – 16.02.2027)", () => {
     assert.ok(fiz.length > 0, "AYT Fizik hiç açılmadı");
     // Kapı aralık başında açılır; yerleşim iyileştirmesi bir gün önce açabilir.
     assert.ok(
-      fiz[0] >= "2026-11-29" && fiz[0] <= "2026-12-02",
-      `AYT Fizik ilk anlatımı ${fiz[0]} (beklenen 29.11–02.12 arası)`,
+      fiz[0] >= "2026-12-01" && fiz[0] <= "2026-12-04",
+      `AYT Fizik ilk anlatımı ${fiz[0]} (beklenen 01.12–04.12 arası)`,
     );
   });
 
@@ -1531,7 +1531,7 @@ describe("sınav günü koruması (H1) — pozitif", () => {
   });
 
   it("program başlangıcı öncesi gün akademik görev üretmez", () => {
-    const before = addDays(S.programStart, -1); // 2026-11-09
+    const before = addDays(S.programStart, -1); // 2026-11-12
     const { slots } = E.buildDailyPlan(seed(), [], [], [], [], S, [], before, new Set());
     assert.equal(slots.length, 0, `başlangıç öncesi ${slots.length} görev atandı`);
   });
@@ -1603,7 +1603,7 @@ describe("mergeTopicSlots — aynı konu tek satırda gösterilir", () => {
     // Izgara bir önizlemedir; her günün anlatımı yapılmış varsayılmalı ki ilerleme
     // kapısı sonraki günlerde açılabilsin. Aksi hâlde haftanın son günleri (ör.
     // pazartesi) yeni konusuz kalıyordu: ders başına yalnızca ilk konu açılabiliyordu.
-    const grid = E.buildWeekGrid(seed(), [], [], [], [], S, [], "2026-11-11");
+    const grid = E.buildWeekGrid(seed(), [], [], [], [], S, [], "2026-11-13");
     for (const day of grid) {
       if (day.weekday === 0) continue; // pazar hafif gün, yeni konu beklenmez
       const hasNew = day.slots.some((s: any) =>
