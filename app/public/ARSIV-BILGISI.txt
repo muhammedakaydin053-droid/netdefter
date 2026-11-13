@@ -1,0 +1,11 @@
+NetDefter kaynak arşivi
+=======================
+
+Kaynak commit : dedcce42e8fa5ca310435f43dd574d3f4f396c5d
+Commit tarihi : 2026-11-13T12:21:37Z
+Üretim zamanı : 2026-11-13T13:28:09.703Z
+Arşiv dosyası : netdefter-kaynak.zip
+ZIP girdisi   : 201 (177 dosya + 24 dizin)
+SHA-256       : fdb01df9b4929e21e18eb3ca3cb4bf04d0b0362a1df070da42bf0df5edce9c64
+İçerik özeti  : 340a2956d50c51a41ee7a484543d98b54a8b2a7c153524ffdaf469939a331358
+Dışlananlar   : app/.grok, proxy.py, upload_server.py, .gitignore, app/.gitignore, app/.prettierrc, app/.project_id, app/AGENTS.md, ZIP-icerigi.txt, ARSIV-BILGISI.txt, app/public/netdefter-kaynak.zip
