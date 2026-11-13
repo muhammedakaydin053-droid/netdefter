@@ -8,7 +8,7 @@ import { Bold, Italic, Underline, Highlighter, List, ListOrdered, ListChecks, He
 import { cn } from "@/lib/utils";
 
 /** Editörde tek tıkla eklenebilen matematik karakterleri. */
-export const MATH_CHARS = ["²", "³", "√", "π", "∫", "≤", "≥", "∑", "∞", "α", "β", "θ", "Δ", "≠", "≈", "±", "×", "÷"];
+const MATH_CHARS = ["²", "³", "√", "π", "∫", "≤", "≥", "∑", "∞", "α", "β", "θ", "Δ", "≠", "≈", "±", "×", "÷"];
 
 function TB({
   active,

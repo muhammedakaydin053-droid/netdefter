@@ -17,7 +17,6 @@ function YanlislarPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted">Sayfa 3</p>
           <h1 className="mt-1 text-3xl font-semibold">Yanlışlarım</h1>
           <p className="mt-2 max-w-xl text-sm text-muted">Kısa tut. Neden + bir satır not yeterli. Fotoğraf yok.</p>
         </div>

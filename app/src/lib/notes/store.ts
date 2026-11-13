@@ -8,7 +8,6 @@ import { create } from "zustand";
 import type { Note, NoteImage } from "./types";
 import { filterAndSortNotes, noteCounts, DEFAULT_FILTER, type NoteFilter, type NoteView } from "./search";
 import * as repo from "./repository";
-import * as images from "./images";
 
 export interface NotesState {
   hydrated: boolean;
