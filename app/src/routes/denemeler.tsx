@@ -40,7 +40,6 @@ function DenemelerPage() {
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted">Sayfa 4</p>
         <h1 className="mt-1 text-3xl font-semibold">Deneme takibi</h1>
         <p className="mt-2 text-sm text-muted">Net = Doğru − Yanlış / 4. Toplam net otomatik.</p>
       </div>

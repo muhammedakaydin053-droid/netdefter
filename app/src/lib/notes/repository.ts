@@ -151,7 +151,7 @@ export async function saveNote(
     await tx.done;
     settled = true;
     return { status: "written", revision: nextRevision };
-  } catch (e) {
+  } catch {
     if (!settled) {
       try {
         tx.abort();

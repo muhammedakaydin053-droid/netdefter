@@ -23,7 +23,6 @@ function TekrarlarPage() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted">Sayfa 5</p>
         <h1 className="mt-1 text-3xl font-semibold">Tekrar takibi</h1>
         <p className="mt-2 text-sm text-muted">
           Bugün: <span className="font-medium text-fg tabular-nums">{formatDate(today)}</span>. Tarih, Konu Takibi’ndeki tekrar sütunundan gelir. Akıllı öneriler performansa göre aralığı kaydırır.

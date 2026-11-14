@@ -25,7 +25,6 @@ function GunlukPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted">Sayfa 7</p>
           <h1 className="mt-1 text-3xl font-semibold">Günlük çalışma</h1>
           <p className="mt-2 text-sm text-muted">Süre dakika cinsinden. Net otomatik.</p>
         </div>

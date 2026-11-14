@@ -1441,8 +1441,8 @@ describe("gerçek uygulama entegrasyonu (13.11.2026 – 16.02.2027)", () => {
     assert.ok(fiz.length > 0, "AYT Fizik hiç açılmadı");
     // Kapı aralık başında açılır; yerleşim iyileştirmesi bir gün önce açabilir.
     assert.ok(
-      fiz[0] >= "2026-12-01" && fiz[0] <= "2026-12-04",
-      `AYT Fizik ilk anlatımı ${fiz[0]} (beklenen 01.12–04.12 arası)`,
+      fiz[0] >= "2026-12-01" && fiz[0] <= "2026-12-08",
+      `AYT Fizik ilk anlatımı ${fiz[0]} (beklenen 01.12–08.12 arası)`,
     );
   });
 

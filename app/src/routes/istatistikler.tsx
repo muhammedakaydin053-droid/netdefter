@@ -21,7 +21,6 @@ function IstatistikPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted">Sayfa 6</p>
           <h1 className="mt-1 text-3xl font-semibold">Soru istatistikleri</h1>
           <p className="mt-2 text-sm text-muted">Alt konular, ana konu başlığında toplanır.</p>
         </div>

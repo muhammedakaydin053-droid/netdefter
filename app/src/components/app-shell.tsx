@@ -6,6 +6,7 @@ import {
   BookOpen,
   CalendarClock,
   CalendarDays,
+  CircleHelp,
   ClipboardList,
   Download,
   FileText,
@@ -116,6 +117,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <Download className="size-4" />
               <span className="hidden sm:inline">Excel şablonu indir</span>
+            </a>
+            <a
+              href="/KULLANIM-KILAVUZU.html"
+              className="inline-flex h-10 items-center gap-2 rounded-[var(--radius-sm)] border border-border bg-surface px-3 text-sm font-medium text-fg hover:opacity-90"
+              title="Kullanım kılavuzu — sayfaların ne işe yaradığını anlatır."
+            >
+              <CircleHelp className="size-4" />
+              <span className="hidden sm:inline">Kılavuz</span>
             </a>
             <a
               href="/DENETIM-RAPORU.html"

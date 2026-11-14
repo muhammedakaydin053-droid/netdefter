@@ -42,7 +42,6 @@ function KonularPage() {
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted">Sayfa 2</p>
         <h1 className="mt-1 text-3xl font-semibold">Konu takibi</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted">
           2026 MEB/ÖSYM müfredatı hazır. Sadece durum, soru sayıları ve tarihleri gir — net, boş ve başarı otomatik.

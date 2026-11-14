@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NetDefter — Kullanım Kılavuzu</title>
+<style>
+:root{--bg:#faf7f2;--s:#fff;--b:#e0d8cc;--f:#26221e;--m:#6b6560;--a:#1e4d4a;--ac:#c2652a;--soft:#f2ece3}
+@media(prefers-color-scheme:dark){:root{--bg:#16181a;--s:#1e2124;--b:#33383d;--f:#eceff1;--m:#9aa2a9;--a:#6fb3ad;--ac:#e08a4f;--soft:#24282b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--f);font-family:ui-sans-serif,system-ui,"Segoe UI",sans-serif;line-height:1.65;-webkit-text-size-adjust:100%}
+header{position:sticky;top:0;z-index:2;background:var(--s);border-bottom:1px solid var(--b);padding:14px 20px}
+.wrap{max-width:920px;margin:0 auto}
+h1{margin:0 0 4px;font-size:19px}
+.sub{margin:0;color:var(--m);font-size:13px}
+main{max-width:920px;margin:0 auto;padding:20px 20px 60px}
+h2{margin:34px 0 10px;font-size:20px;border-bottom:1px solid var(--b);padding-bottom:6px}
+h3{margin:22px 0 6px;font-size:16px}
+p,li{font-size:15px}
+ul,ol{padding-left:22px}
+li{margin:4px 0}
+code{background:var(--soft);padding:1px 5px;border-radius:4px;font-size:13.5px}
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:14px}
+th,td{border:1px solid var(--b);padding:7px 9px;text-align:left;vertical-align:top}
+th{background:var(--soft);font-weight:600}
+.note{background:var(--soft);border-left:3px solid var(--a);padding:10px 14px;border-radius:6px;margin:12px 0}
+.warn{border-left-color:var(--ac)}
+.toc{background:var(--s);border:1px solid var(--b);border-radius:12px;padding:14px 20px}
+.toc ol{margin:6px 0;columns:2;column-gap:28px}
+@media(max-width:600px){.toc ol{columns:1}}
+.toc a{color:var(--a);text-decoration:none}
+.toc a:hover{text-decoration:underline}
+.badge{display:inline-block;background:var(--a);color:#fff;border-radius:20px;padding:1px 9px;font-size:12px;font-weight:600}
+.kv{color:var(--m);font-size:14px}
+footer{max-width:920px;margin:0 auto;padding:0 20px 40px;color:var(--m);font-size:13px;border-top:1px solid var(--b);padding-top:16px}
+a.back{display:inline-flex;align-items:center;height:36px;padding:0 12px;border:1px solid var(--b);border-radius:8px;background:var(--s);color:var(--f);text-decoration:none;font-size:14px;font-weight:600}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1>NetDefter — Kullanım Kılavuzu</h1>
+  <p class="sub">YKS 2027 takip ve planlama uygulaması · Sürüm: 13.11.2026</p>
+  <p style="margin:10px 0 0"><a class="back" href="/">← Uygulamaya dön</a></p>
+</div></header>
+<main>
+
+<p>Bu kılavuz, NetDefter'i günlük hayatta nasıl kullanacağınızı anlatır. Uygulamanın <strong>gerçek davranışına</strong> dayanır; olmayan bir özellik anlatılmaz. Teknik bilgi gerektirmez.</p>
+
+<div class="note">
+<strong>Önce bilmeniz gereken 3 şey</strong>
+<ul>
+<li><strong>Verileriniz yalnızca bu tarayıcıda saklanır.</strong> Sunucuya gönderilmez, hesap açmanız gerekmez.</li>
+<li><strong>Tarayıcı verilerini temizlerseniz kayıtlar silinir.</strong> Cihaz değiştirmeden veya temizlemeden önce mutlaka <a href="#yedekleme">JSON yedeği</a> indirin.</li>
+<li><strong>Sınav tarihleri sabittir:</strong> TYT 19.06.2027, AYT 20.06.2027.</li>
+</ul>
+</div>
+
+<div class="toc">
+<strong>İçindekiler</strong>
+<ol>
+<li><a href="#ozet">Özet</a></li>
+<li><a href="#program">Program</a></li>
+<li><a href="#konular">Konular</a></li>
+<li><a href="#yanlislar">Yanlışlar</a></li>
+<li><a href="#denemeler">Denemeler</a></li>
+<li><a href="#tekrarlar">Tekrar</a></li>
+<li><a href="#istatistikler">İstatistik</a></li>
+<li><a href="#dagilim">Dağılım</a></li>
+<li><a href="#gunluk">Günlük</a></li>
+<li><a href="#arsiv">Arşiv</a></li>
+<li><a href="#notlar">Notlarım</a></li>
+<li><a href="#yedekleme">Yedekleme ve geri yükleme</a></li>
+<li><a href="#sss">Sık sorulanlar</a></li>
+</ol>
+</div>
+
+<p class="kv">Alt kısımdaki menü (mobilde ekranın altında, masaüstünde üstte) 11 sayfa arasında geçiş yapmanızı sağlar. Sağ üstteki düğme açık/koyu temayı değiştirir; tercihiniz hatırlanır.</p>
+
+<h2 id="ozet">1. Özet <span class="badge">Kontrol paneli</span></h2>
+<p>Uygulamayı açtığınızda gördüğünüz ilk sayfa. Her şeyin tek ekranda toplandığı yer.</p>
+<ul>
+<li><strong>Bugünün planı:</strong> "Bugün ne yapmalıyım?" sorusunun cevabı. Günün çalışma sırası, korunan spor/yemek/serbest zaman bloklarıyla birlikte gösterilir. Program başlamadan önce burada "Program şu tarihte başlıyor" yazar.</li>
+<li><strong>Bugün tekrar etmen gerekenler:</strong> Tekrar tarihi gelmiş konular.</li>
+<li><strong>Kısa performans yorumu:</strong> "Yorumla" düğmesi mevcut özet sayılarını kısa bir cümleye döker. Sayılar her zaman formülle hesaplanır; yorum düğmesi yalnızca var olan veriyi anlatır, veri uydurmaz. Bu özellik kapalıysa "Yorum servisi bu ortamda kapalı" uyarısı çıkar; sayısal öneriler yine çalışır.</li>
+<li><strong>Üç özet kutusu:</strong> <em>TYT</em>, <em>AYT Sayısal</em> ve <em>Genel</em>. Her kutuda toplam konu, biten, çalışılan, başlanmamış, tekrar gereken, konu ilerleme yüzdesi, toplam soru, doğru, yanlış, boş, net ve başarı yüzdesi yer alır.</li>
+<li><strong>Ders bazında ilerleme:</strong> Her dersin ne kadarının bittiğini çubuklarla gösterir.</li>
+<li>Sağ üstte: <em>Sıfırla</em>, <em>Excel şablonu indir</em> ve (yedek varsa) <em>Yedeği geri al</em> düğmeleri.</li>
+</ul>
+
+<h2 id="program">2. Program <span class="badge">Günlük ve haftalık plan</span></h2>
+<p>Planlamanın beyni. Sınava kalan süreyi, fazları ve günlük tempoyu gösterir.</p>
+<ul>
+<li><strong>Üst bilgi:</strong> Başlangıç tarihi, sınava kalan gün, çalışma günü sayısı (pazarlar hariç) ve bu tempoda günde kaç yeni konu gerektiği.</li>
+<li><strong>Faz takvimi:</strong> Program başlangıçtan sınava <strong>beş faza</strong> bölünür: TYT çekirdeği → AYT açılışı → AYT derinleşme + TYT koruma → Eksik kapatma ve pekiştirme → Son dönem (deneme ağırlıklı). Son iki haftada yeni konu açılmaz; tekrar ve deneme kalır. Hangi fazda olduğunuz "şimdi" etiketiyle işaretlenir.</li>
+<li><strong>TYT ne kadar sürer:</strong> Günde 1, 2 veya 3 yeni konu çalışırsanız TYT'nin ne zaman biteceğini üç senaryo hâlinde gösterir. Gerçekçi tempo günde 1–2 konudur.</li>
+<li><strong>Hızlı yol ve kapılar:</strong> AYT'ye geçiş için gereken ön koşulları gösterir. AYT Matematik/Geometri, Fizik, Kimya ve Biyoloji için ayrı kapılar vardır. Kapı açılınca ilgili AYT dersi başlar. TYT'yi tamamen bitirmek şart değildir.</li>
+<li><strong>Önümüzdeki 7 gün:</strong> Haftalık görünüm. Pazar günleri hafiftir; deneme hazır olduğunda cumartesiye yerleşir.</li>
+<li><strong>Bugünün sırası:</strong> Saat saat günün planı.</li>
+<li><strong>Ayarlar:</strong> Uyanma, uyuma, günlük ders süresi (dk), haftalık hedef (saat), hedef sınav, program başlangıcı, günlük paragraf ve problem hedefi.</li>
+<li><strong>Düğmeler:</strong> <em>Dünü kaçırdım (yay)</em> — bir günlük aksama olduğunda işleri yayar; <em>Programı bugünden yeniden planla</em> — konu ve deneme kayıtlarınıza dokunmadan planı bugünden yeniden kurar; <em>Devirleri temizle</em> — biriken ertelenmiş işleri siler.</li>
+</ul>
+<div class="note">Planlama hedef tarihleri: Program başlangıcı <strong>13.11.2026</strong>, TYT ilk tur hedefi <strong>15.02.2027</strong>, AYT ilk tur hedefi <strong>23.04.2027</strong>. Bu tarihler onaylanmış planın parçasıdır.</div>
+
+<h2 id="konular">3. Konular <span class="badge">Konu takibi</span></h2>
+<p>Uygulamanın kalbi. 2026 MEB/ÖSYM müfredatı hazırdır; siz yalnızca <strong>durum, soru sayıları ve tarihleri</strong> girersiniz — net, boş ve başarı yüzdesi otomatik hesaplanır.</p>
+<h3>Tablodaki sütunlar</h3>
+<table>
+<tr><th>Sütun</th><th>Anlamı</th></tr>
+<tr><td>Durum</td><td>Başlamadım · Çalışıyorum · Bitti · Tekrar Gerekli</td></tr>
+<tr><td>Aşama</td><td>Konunun öğrenme düzeyi: Görülmedi → Konu anlatımı görüldü → Temel soru çözümü yapıldı → Öğrenildi (karma soruda uygulanabiliyor) → Tekrar gerekiyor</td></tr>
+<tr><td>Akıllı</td><td>Performansa göre sağlık: İyi · Orta · Zayıf · Kritik · Veri yok</td></tr>
+<tr><td>Soru / D / Y / Boş</td><td>Girdiğiniz toplam soru, doğru ve yanlış. Boş otomatik bulunur.</td></tr>
+<tr><td>Net / Başarı</td><td>Net = Doğru − Yanlış ÷ 4 · Başarı = Doğru ÷ Toplam</td></tr>
+<tr><td>Son çalışma / Tekrar / Kaynak</td><td>Çalıştığınız tarih, planlanan tekrar tarihi ve kaynak notu</td></tr>
+</table>
+<h3>Bir konu ne zaman "öğrenildi" sayılır?</h3>
+<p>Üç koşul birden gerekir: durum <strong>Bitti</strong> olmalı, <strong>en az 15 soru</strong> çözülmüş olmalı ve başarı <strong>%70 veya üzeri</strong> olmalı. Bu eşikler sabittir.</p>
+<div class="note warn">Hatalı giriş koruması: Negatif soru sayısı kabul edilmez, doğru + yanlış toplamı aşamaz, toplam 0 iken doğru/yanlış girilemez ve başarı yüzdesi hiçbir zaman %100'ü geçmez. Geçersiz satırlar "öğrenildi" sayılmaz.</div>
+<p>Arama ve filtre ile kalabalık listeyi daraltabilirsiniz (ders, sınav, durum).</p>
+
+<h2 id="yanlislar">4. Yanlışlar <span class="badge">Yanlış analizi</span></h2>
+<p>Yanlışlarınızı kısa tutarak kaydettiğiniz yer. Kural: <strong>neden + tek satır not yeterli, fotoğraf yok.</strong></p>
+<ul>
+<li>Sütunlar: Tarih, Sınav, Ders, Konu, Alt konu, Kaynak, No, Neden, Kısa not, Tekrar, Sonuç.</li>
+<li><strong>Neden</strong> seçenekleri: Dikkat hatası, Bilgi eksikliği, Yöntem eksikliği ve benzeri. Hatanın kökenini etiketlemek, tekrar stratejisini belirler.</li>
+<li><strong>Sonuç</strong> seçenekleri: Tekrar çözüldü · Hâlâ yanlış · Artık yapabiliyorum.</li>
+</ul>
+<p>Yanlış kayıtları planlamaya da girer: bugünün planı, analiz edilmesi gereken yanlışları otomatik olarak işaretler.</p>
+
+<h2 id="denemeler">5. Denemeler <span class="badge">Deneme takibi</span></h2>
+<ul>
+<li><strong>Net hesabı:</strong> Net = Doğru − Yanlış ÷ 4. Toplam net otomatik hesaplanır.</li>
+<li><strong>Grafikler:</strong> TYT toplam net ve AYT sayısal toplam net gelişimi zaman içinde çizilir. Deneme ekledikçe grafik oluşur.</li>
+<li><strong>Deneme planı:</strong> Deneme sıklığı takvime değil, <strong>çalışılan konu kapsamına</strong> ve <strong>son üç denemenin ortalamasına</strong> bakar. Sistem size ne zaman genel deneme çözmenin anlamlı olduğunu söyler.</li>
+<li><strong>Branş denemesi:</strong> Kapsamı %50'yi geçen dersler branş denemesi için hazır sayılır ve listelenir.</li>
+</ul>
+
+<h2 id="tekrarlar">6. Tekrar <span class="badge">Tekrar takibi</span></h2>
+<p>Unutmayı engelleyen aralıklı tekrar sistemi.</p>
+<ul>
+<li>Tekrar tarihleri <strong>Konu Takibi</strong>'ndeki "Tekrar" sütunundan gelir.</li>
+<li><strong>Akıllı tekrar önerisi</strong> performansınıza göre aralığı kaydırır: temel aralıklar 1, 3, 7, 14, 30, 45 gündür. Başarınız yüksekse aralık uzar, düşükse kısalır (çok düşükse ertesi güne çekilir).</li>
+<li>Bu sayfa, bugün ve yakında tekrar etmeniz gereken konuları öncelik sırasıyla listeler.</li>
+</ul>
+
+<h2 id="istatistikler">7. İstatistik <span class="badge">Soru istatistikleri</span></h2>
+<p>Çözdüğünüz soruların ders ve konu bazında dökümü. Alt konular, <strong>ana konu başlığında toplanır</strong>; böylece dağınık alt başlıklar tek bir resimde birleşir.</p>
+<p>Yalnızca <strong>en az 10 soru</strong> çözdüğünüz konular listeye girer (anlamlı istatistik için). Henüz yeterli veri yoksa "Henüz 10 soru çözülmüş konu yok" mesajı görünür.</p>
+
+<h2 id="dagilim">8. Dağılım <span class="badge">Ne çıkıyor, neye çalışmalı</span></h2>
+<p>Sınavda hangi konuların çıktığına dair yol haritası. Üç görünüm vardır:</p>
+<ul>
+<li><strong>Özet:</strong> TYT veya AYT için konuların öncelik sırası ve beklenen soru sayıları.</li>
+<li><strong>Garanti konular:</strong> Her sene garanti gelen konular.</li>
+<li><strong>Yıllara göre:</strong> Son yıllarda en sık çıkan konular ve <strong>"Yıllık ortalama soru"</strong> sayıları.</li>
+</ul>
+<p>TYT/AYT seçimi ile listeyi değiştirebilirsiniz. Sayfada kaynak bağlantıları da bulunur.</p>
+<div class="note warn">Dürüst uyarı: Bu listeler koçluk derlemesidir; ÖSYM resmî konu-soru tablosu yayınlamaz. Yani "garanti" bir iddia değil, çalışma ağırlığı için bir gerekçedir.</div>
+
+<h2 id="gunluk">9. Günlük <span class="badge">Günlük çalışma</span></h2>
+<p>O gün ne yaptığınızın kaydı. Süre dakika cinsindendir; net otomatik hesaplanır.</p>
+<ul>
+<li>Üstte dört özet: günlük süre, günlük soru, haftalık süre, haftalık soru.</li>
+<li>Sütunlar: Tarih, Ders, Konu, Tür, Süre, Soru, D, Y, Net, Not.</li>
+<li><strong>Tür</strong> seçenekleri: Konu anlatımı, Soru çözümü, Tekrar, Deneme, Yanlış analizi.</li>
+</ul>
+<p>Buradaki kayıtlar Özet ve İstatistik sayfalarını da besler.</p>
+
+<h2 id="arsiv">10. Arşiv <span class="badge">Arşivlenen konular</span></h2>
+<p>Müfredattan kaldırılan konulara ait çalışma geçmişiniz burada saklanır. Önemli özellik: bir konu aynı kimlikle müfredata <strong>geri dönerse</strong>, kayıtlarınız otomatik olarak aktif listeye taşınır. Yani emeğiniz kaybolmaz.</p>
+<p>Bu ekran <strong>yalnızca görüntüleme</strong> içindir; buradan düzenleme yapılmaz. Normalde boştur — müfredat dışı kalmış bir konunuz olduğunda dolar.</p>
+
+<h2 id="notlar">11. Notlarım <span class="badge">Zengin metin notları</span></h2>
+<p>Konulardan bağımsız, serbest not tutma alanı. Notlar ayrı bir depoda (tarayıcının IndexedDB'si) tutulur ve uygulamanın geri kalanından etkilenmez.</p>
+<h3>Not düzenleme araçları</h3>
+<p>Kalın, İtalik, Altı çizili, Vurgu, Başlık 1/2, Madde listesi, Numaralı liste, Görev listesi, Geri al / Yinele ve <strong>Görsel ekle</strong>.</p>
+<h3>Düzenleme ve filtreleme</h3>
+<ul>
+<li>Arama (başlık, ders, konu, içerik), sınav filtresi ve ders filtresi.</li>
+<li>Her not kartında: favori, sabitle (pin), arşivle, sil ve kalıcı sil. Silinen notlar önce çöp kutusuna gider; oradan geri getirilebilir.</li>
+</ul>
+<h3>Notlarım yedekleme</h3>
+<p>Notlarım bölümünün kendi yedekleme satırı vardır: <strong>JSON indir</strong>, <strong>ZIP indir</strong> (görsellerle birlikte), <strong>JSON birleştir</strong> (mevcut notlarınıza ekler) ve <strong>ZIP içe al</strong>.</p>
+
+<h2 id="yedekleme">Yedekleme ve geri yükleme</h2>
+<p>Bu bölüm, verinizi güvende tutmanın en önemli parçasıdır. Veriler yalnızca tarayıcınızda durur; bu yüzden düzenli yedek almak kritiktir.</p>
+<h3>Yedek alma (JSON)</h3>
+<p>Özet sayfasındaki <strong>Yedekleme</strong> kutusundan <em>JSON yedeği indir</em> düğmesine basın. Dosya cihazınıza iner.</p>
+<h3>Geri yükleme (içe aktarma)</h3>
+<ol>
+<li><em>JSON yedeğini içe aktar</em> ile dosyayı seçin.</li>
+<li>Sistem dosyayı okur ve <strong>onay penceresi</strong> gösterir: hangi dosya olduğu ve ne kadar veri içerdiği.</li>
+<li>Onaylarsanız yedek yüklenir. <strong>Bu işlem mevcut verinizin üzerine yazar.</strong></li>
+</ol>
+<div class="note"><strong>Güvenlik ağı:</strong> İçe aktarma öncesi mevcut durumunuz otomatik olarak yedeklenir. Bir sorun olursa Özet sayfasındaki <strong>"Yedeği geri al"</strong> düğmesiyle önceki hâle dönebilirsiniz. Ayrıca bozuk bir dosya seçerseniz sistem onu reddeder ve <strong>mevcut veriniz değişmez</strong>.</div>
+<h3>Her şeyi sıfırlama</h3>
+<p>Özet sayfasındaki <em>Sıfırla</em> düğmesi üç adımlı bir onay ister (uyarı → "emin misiniz?" → kutuya <code>SIFIRLA</code> yazma). Sıfırlamadan önce de otomatik yedek alınır.</p>
+<h3>Excel şablonu hakkında</h3>
+<p>Menüdeki <em>Excel şablonu indir</em> düğmesi <strong>boş bir çalışma dosyası</strong> indirir. Bu dosya uygulamadaki verilerinizi <strong>içermez</strong>; yalnızca Excel'de elle çalışmak isterseniz hazır bir tablodur. Verinizi taşımak veya yedeklemek için JSON yedeğini kullanın.</p>
+
+<h2 id="sss">Sık sorulanlar</h2>
+<h3>Verilerim nerede saklanıyor? Yedek almam şart mı?</h3>
+<p>Veriler yalnızca bu tarayıcıda saklanır. Cihaz değiştirirken veya tarayıcı verilerini temizlerken kaybolur. Düzenli JSON yedeği almak şarttır.</p>
+<h3>Uygulamayı telefona kurabilir miyim?</h3>
+<p>Evet. Tarayıcı menüsünden "Ana ekrana ekle" ile uygulama gibi kurulabilir. Ancak <strong>çevrimdışı çalışmaz</strong>; internet bağlantısı gerekir. (Veriniz yine cihazda kalır.)</p>
+<h3>Giriş yapmam gerekiyor mu?</h3>
+<p>Hayır. Uygulama tek kullanıcılıdır ve giriş gerektirmez.</p>
+<h3>Bir konuyu yanlışlıkla sildim, geri gelir mi?</h3>
+<p>Konu kayıtları için "Yedeği geri al", bir <strong>içe aktarma veya sıfırlama sonrasında</strong> çalışır (o an otomatik alınan yedeğe döner). Bunun dışında geçmiş bir hâle dönmek için daha önce indirdiğiniz bir JSON yedeğini içe aktarın. Bu yüzden önemli değişikliklerden önce JSON yedeği alın. Notlarım'da ise silinen notlar önce çöp kutusuna gider.</p>
+<h3>"Akıllı" sütunundaki renkler ne anlama geliyor?</h3>
+<p>Konunun performans sağlığını gösterir: İyi (yeşil), Orta, Zayıf, Kritik (kırmızı) ve Veri yok. Kritik ve zayıf konular tekrar listesinde öne çıkar.</p>
+<h3>AYT'ye ne zaman başlarım?</h3>
+<p>TYT'yi tamamen bitirmeniz gerekmez. Program sayfasındaki "Hızlı yol ve kapılar" bölümünde ilgili dersin kapısı dolduğunda (örneğin TYT matematik çekirdeği, fizik, kimya) AYT otomatik başlar.</p>
+
+</main>
+<footer>
+NetDefter kullanım kılavuzu · Bu belge uygulamanın gerçek davranışına göre hazırlanmıştır. <a href="/">Uygulamaya dön</a>
+</footer>
+</body>
+</html>
