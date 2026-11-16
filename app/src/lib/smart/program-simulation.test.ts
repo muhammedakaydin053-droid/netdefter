@@ -1,5 +1,5 @@
 /**
- * Tam dönem simülasyonu — 13.11.2026 → 20.06.2027.
+ * Tam dönem simülasyonu — 17.11.2026 → 20.06.2027.
  *
  * İki senaryo gerçek uygulama çağrısıyla (program.tsx biçimi) işletilir:
  *   1) hiç deneme/yanlış verisi yok,
@@ -275,7 +275,7 @@ function runPeriod(opts: { withData: boolean | "both" }): Metrics {
   };
 }
 
-describe("tam dönem simülasyonu (11.11.2026 – 20.06.2027)", () => {
+describe("tam dönem simülasyonu (17.11.2026 – 20.06.2027)", () => {
   let A: Metrics;
   let B: Metrics;
   before(() => {
@@ -480,7 +480,7 @@ describe("TYT–AYT tam deneme dengesi (sonuç kaydından bağımsız)", () => {
 // devreye girer; ikinci dönem round1Done ile, üçüncü dönem her iki koşulla da
 // kapsanır.
 const PERIODS = [
-  { id: "P1", label: "16.11.2026–09.02.2027 (2:1 fazı)", from: "2026-11-16", to: "2027-02-09", rule: "2:1" as const },
+  { id: "P1", label: "17.11.2026–09.02.2027 (2:1 fazı)", from: "2026-11-17", to: "2027-02-09", rule: "2:1" as const },
   { id: "P2", label: "10.02.2027–20.04.2027 (round1 sonrası 1:1)", from: "2027-02-10", to: "2027-04-20", rule: "1:1" as const },
   { id: "P3", label: "21.04.2027–20.06.2027 (son 60 gün 1:1)", from: "2027-04-21", to: "2027-06-20", rule: "1:1" as const },
 ];
@@ -544,8 +544,8 @@ describe("dönemsel tam deneme dağılımı (tarih bazlı)", () => {
 
   it("sonuç kaydı dönemsel dağılımı değiştirmez (üç senaryo tutarlı)", () => {
     // Sayı toleransı 3'tür (eski 2 DEĞİL): kök neden `tytMockReady` kapısıdır.
-    // Kayıt girilince kapı 22.11.2026'da açılır; 16.11 başlangıcı (13.11 Cuma →
-    // 16.11 Pazartesi, +3 gün) 2:1 kadansını takvimde kaydırıp P1'e bir ek tam
+    // Kayıt girilince kapı 22.11.2026'da açılır; 17.11 başlangıcı (16.11 Pazartesi →
+    // 17.11 Salı, +1 gün) 2:1 kadansını takvimde kaydırıp P1'e bir ek tam
     // TYT denemesi sığdırır (3 → 6). Bu bir kusur değil, takvim hizasıdır.
     // GERÇEK sözleşme orandır ve o DEĞİŞMEZ (aşağıdaki oran kontrolü). Sayı
     // gevşemesini bu sıkı oran kontrolü telafi eder.
@@ -561,7 +561,7 @@ describe("dönemsel tam deneme dağılımı (tarih bazlı)", () => {
         Math.max(...aytValues) - Math.min(...aytValues) <= 3,
         `${p.label}: AYT sayıları senaryolar arası savruluyor (${aytValues.join(", ")})`,
       );
-      // Sıkı kontrol: TYT/AYT oranı iki başlangıç tarihinde de (13.11 ve 16.11)
+      // Sıkı kontrol: TYT/AYT oranı iki başlangıç tarihinde de (16.11 ve 17.11)
       // aynıdır. Sonuç kaydı dağılımı TERSİNE çevirmemeli; bu değişmez takvimden
       // bağımsızdır ve sayı toleransının gevşetilmesini telafi eder.
       const ratios = counts.map((c) => c.tyt / (c.tyt + c.ayt));
