@@ -76,11 +76,11 @@ function mockDayCounters(
   return { mockDays, fullMockDays };
 }
 
-function toMin(hhmm: string) {
+export function toMin(hhmm: string) {
   const [h, m] = hhmm.split(":").map(Number);
   return h * 60 + m;
 }
-function fromMin(min: number) {
+export function fromMin(min: number) {
   const h = Math.floor(min / 60);
   const m = min % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
@@ -525,6 +525,15 @@ function busyIntervals(settings: ScheduleSettings, weekday: number) {
   return busy.sort((a, b) => a.start - b.start);
 }
 
+/**
+ * Gün içi yeniden yerleştirme için yaşam blokları (dışa aktarılmış sarmalayıcı).
+ * Aynı `busyIntervals` mantığını paylaşır; böylece yeni yerleştirme canlı motorla
+ * birebir aynı blokları görür.
+ */
+export function lifeBlocks(settings: ScheduleSettings, weekday: number) {
+  return busyIntervals(settings, weekday);
+}
+
 function freeWindows(settings: ScheduleSettings, weekday: number) {
   const wake = toMin(settings.wake);
   const sleep = toMin(settings.sleep);
@@ -534,6 +543,33 @@ function freeWindows(settings: ScheduleSettings, weekday: number) {
   for (const b of busy) {
     if (b.start > cursor + 25) gaps.push({ start: cursor, end: b.start });
     cursor = Math.max(cursor, b.end);
+  }
+  if (sleep > cursor + 25) gaps.push({ start: cursor, end: sleep });
+  return gaps;
+}
+
+/**
+ * Gün içi yeniden yerleştirme için boş çalışma aralıkları.
+ *
+ * Canlı motordan FARKI: uyuma saatinden sonra başlayan bir yaşam bloğu (ör.
+ * "Dinlenme 21:30") boşluk açmaz. Canlı motorun `freeWindows`'u `cursor`u bloğun
+ * SONUNA taşıdığı için, uyumadan sonraki bir blok yüzünden uyuma saatini AŞAN
+ * boşluk üretilebiliyordu. Burada üst sınır kesin olarak uyuma saatidir: hiçbir
+ * aralık `sleep`i geçemez, dolayısıyla hiçbir görev gece yarısını veya uyumayı
+ * aşamaz.
+ */
+export function freeWindowsForReplan(settings: ScheduleSettings, weekday: number, floorMinute = 0) {
+  const wake = Math.max(toMin(settings.wake), floorMinute);
+  const sleep = toMin(settings.sleep);
+  const busy = busyIntervals(settings, weekday).filter((b) => b.start < sleep);
+  const gaps: { start: number; end: number }[] = [];
+  let cursor = wake;
+  for (const b of busy) {
+    const start = Math.max(wake, b.start);
+    const end = Math.min(sleep, b.end);
+    if (end <= cursor) continue;
+    if (start > cursor + 25) gaps.push({ start: cursor, end: start });
+    cursor = Math.max(cursor, end);
   }
   if (sleep > cursor + 25) gaps.push({ start: cursor, end: sleep });
   return gaps;
@@ -560,7 +596,7 @@ function freeWindows(settings: ScheduleSettings, weekday: number) {
  * kalıcı olarak bloke ediliyor, 14.11.2026'dan sonra yeni konu üretimi sıfıra
  * iniyor ve AYT kapıları hiç açılmıyordu. Üstelik maliyeti O(gün²) idi.
  */
-function taughtTopics(topics: TopicRow[], daily: DailyRow[]): Set<string> {
+export function taughtTopics(topics: TopicRow[], daily: DailyRow[]): Set<string> {
   const used = new Set<string>();
   for (const t of topics) {
     if (t.status !== "Başlamadım") used.add(`${t.exam}|${t.subject}|${t.topic}`);
@@ -1774,6 +1810,9 @@ export function mergeTopicSlots(slots: PlanSlot[]): PlanSlot[] {
       targetQ: (prev.targetQ ?? 0) + (s.targetQ ?? 0),
       kinds,
       wrongIds: [...(prev.wrongIds ?? []), ...(s.wrongIds ?? [])],
+      // Parçalardan biri taştıysa birleşik satır da "sığmadı" kalır; kısmen yerleşmiş
+      // bir konu tamamen yerleşmiş gibi gösterilmez.
+      ...(prev.unplaced || s.unplaced ? { unplaced: true } : {}),
     };
   }
   // Bitişik aralıkları birleştir (ör. 09:30–10:25 + 10:25–11:20 → 09:30–11:20);

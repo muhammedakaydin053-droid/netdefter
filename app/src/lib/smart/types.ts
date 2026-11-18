@@ -47,6 +47,12 @@ export interface PlanSlot {
   kinds?: StudyType[];
   /** Birleştirilmiş satırın gerçek saat aralıkları; ör. ["09:30–11:20"]. */
   ranges?: string[];
+  /**
+   * Gün içi ayar değişikliği sonrası yeniden yerleştirmede bu görev yeni boş
+   * aralıklara sığmadı. Görev SİLİNMEZ; eski saati korunur ama artık yeni ayarla
+   * uyumlu değildir ve arayüzde "sığmadı" olarak işaretlenir (bkz. `frozen.ts`).
+   */
+  unplaced?: boolean;
 }
 
 export interface ReviewRec {
@@ -91,6 +97,22 @@ export const DEFAULT_SETTINGS: ScheduleSettings = {
   paragraphTarget: 40,
   problemTarget: 20,
 };
+
+/**
+ * Sınav tarihleri — projenin DEĞİŞMEZ hedefleri, kullanıcı ayarı DEĞİLDİR.
+ *
+ * TYT 19.06.2027 Cumartesi, AYT 20.06.2027 Pazar (ÖSYM 2027-YKS takvimi).
+ * `data/targets.ts` `TARGETS.tytExam`/`aytExam` ile birebir aynıdır ve planlama
+ * motorunun geri sayım çapasıdır. UI'da salt okunur gösterilir; store
+ * `updateSettings` bu alanı yok sayar; eski/hatalı kayıtlı veri `merge`,
+ * `importData` ve `restoreBackup` sırasında sessizce sabit değere çekilir.
+ */
+export const EXAM_TARGETS = {
+  /** TYT sınav günü. */
+  tyt: "2027-06-19",
+  /** AYT sınav günü. */
+  ayt: "2027-06-20",
+} as const;
 
 export const HEALTH_LABEL: Record<Health, string> = {
   iyi: "İyi",

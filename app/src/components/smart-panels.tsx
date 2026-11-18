@@ -2,8 +2,10 @@ import { useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { HealthBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useAppStore } from "@/lib/store";
-import { buildDailyPlan, buildInsights, dueReviews, mergeTopicSlots, rankTopics } from "@/lib/smart/engine";
+import { useAppStore, intradayOverflow } from "@/lib/store";
+import { buildDailyPlan, buildInsights, dueReviews, rankTopics } from "@/lib/smart/engine";
+import { frozenTodaySlots } from "@/lib/smart/frozen";
+import { IntradayOverflowNotice } from "@/components/intraday-dialog";
 import { formatPct, todayISO, formatDate } from "@/lib/utils";
 import { requestAiComment } from "@/lib/ai-comment";
 import type { PlanSlot } from "@/lib/smart/types";
@@ -26,9 +28,17 @@ export function TodayPlanPanel() {
   const markWrongsAnalyzed = useAppStore((s) => s.markWrongsAnalyzed);
   const branchMockHistory = useAppStore((s) => s.branchMockHistory);
   const markBranchMock = useAppStore((s) => s.markBranchMock);
-  const { slots, analyzedWrongIds, branchMockSubject } = buildDailyPlan(topics, daily, wrongs, tytExams, aytExams, settings, carry, todayISO(), undefined, analyzedWrongs, branchMockHistory);
+  const frozenPlan = useAppStore((s) => s.frozenPlan);
+  const ensurePlan = useAppStore((s) => s.ensurePlan);
+  // Yan kanallar (yanlış analizi / branş denemesi işaretleri) canlı motordan;
+  // gösterilen plan ise dondurulmuş pencereden gelir (kayma önleyici).
+  const { analyzedWrongIds, branchMockSubject } = buildDailyPlan(topics, daily, wrongs, tytExams, aytExams, settings, carry, todayISO(), undefined, analyzedWrongs, branchMockHistory);
   // Aynı konunun anlatımı ve soru çözümü tek satırda gösterilir (görünüm amaçlı).
-  const merged = mergeTopicSlots(slots);
+  const merged = frozenTodaySlots(frozenPlan, todayISO());
+  useEffect(() => {
+    ensurePlan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.programStart, settings.examDate, settings.studyMinutes, settings.weeklyHours, settings.mockWeekdays.join(",")]);
   // `analyzedWrongIds` yalnızca bugün tamamlanmış (günlük kaydı girilmiş) yanlış
   // analizi görevlerini taşır; üretim/yerleşim tek başına işaretlemez.
   useEffect(() => {
@@ -48,7 +58,7 @@ export function TodayPlanPanel() {
           Program ve ayarlar
         </Link>
       </div>
-      {slots.length === 0 ? (
+      {merged.length === 0 ? (
         <p className="text-sm text-muted">
           {settings.programStart && todayISO() < settings.programStart
             ? `Program ${formatDate(settings.programStart)} tarihinde başlıyor. Bugün ders günü sayılmıyor; kalan gün sayısı o tarihten hesaplanır.`
@@ -60,7 +70,10 @@ export function TodayPlanPanel() {
             <li key={s.id} className="rounded-[var(--radius-md)] border border-border bg-bg-elevated px-3 py-2.5">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div className="font-medium tabular-nums">
-                  {s.ranges?.length ? s.ranges.join(" · ") : `${s.start}–${s.end}`}
+                  <span className={s.unplaced ? "text-warn" : undefined}>
+                    {s.ranges?.length ? s.ranges.join(" · ") : `${s.start}–${s.end}`}
+                    {s.unplaced ? " (eski saat)" : ""}
+                  </span>
                   <span className="ml-2 font-normal text-fg">
                     {s.exam ? `${s.exam} ${s.subject}` : s.subject} — {s.topic}
                   </span>
@@ -69,11 +82,17 @@ export function TodayPlanPanel() {
                   {kindLabel(s)} · {s.minutes} dk{s.targetQ ? ` · ${s.targetQ} soru` : ""} · {s.priority}
                 </span>
               </div>
+              {s.unplaced ? (
+                <p className="mt-1 text-xs font-medium text-warn">
+                  Yeni zaman ayarlarına sığmadı — eski saati korunuyor, geçerli sayılmaz.
+                </p>
+              ) : null}
               <p className="mt-1 text-xs text-muted">{s.reason}</p>
             </li>
           ))}
         </ol>
       )}
+      <IntradayOverflowNotice overflow={intradayOverflow(frozenPlan)} />
     </section>
   );
 }
