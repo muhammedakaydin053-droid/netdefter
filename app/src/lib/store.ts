@@ -329,7 +329,7 @@ function snapshot(s: AppState): DataSnapshot {
  * Kayıtlı (persist) ayarların sürümü. Bir kayıtta bu sürümden eski bir `version`
  * görülürse `migratePersistedState` çalışır.
  */
-export const PERSIST_VERSION = 8;
+export const PERSIST_VERSION = 9;
 
 /**
  * `merge` ile `onRehydrateStorage` arasındaki tek seferlik onarım sinyali.
@@ -355,8 +355,10 @@ export const V5_PROGRAM_START = "2026-11-11";
 export const V6_PROGRAM_START = "2026-11-13";
 /** v7 varsayılanı (artık eski): 16.11.2026 Pazartesi program başlangıcı. */
 export const V7_PROGRAM_START = "2026-11-16";
-/** Güncel varsayılan: 17.11.2026 Salı program başlangıcı. */
-export const MIGRATED_PROGRAM_START = "2026-11-17";
+/** v8 varsayılanı (artık eski): 17.11.2026 Salı program başlangıcı. */
+export const V8_PROGRAM_START = "2026-11-17";
+/** Güncel varsayılan: 20.11.2026 Cuma program başlangıcı. */
+export const MIGRATED_PROGRAM_START = "2026-11-20";
 
 /**
  * Eski kayıtlı durumu güncel şemaya taşır — SAF ve tek seferlik.
@@ -364,7 +366,7 @@ export const MIGRATED_PROGRAM_START = "2026-11-17";
  * Sürümlü zincir, `programStart` TAM OLARAK eski bir varsayılana eşitse
  * ilerletilir: v0 (`2026-11-01`) → v1 (`2026-11-04`) → v2 (`2026-11-05`)
  * → v3 (`2026-11-09`) → v4 (`2026-11-10`) → v5 (`2026-11-11`) → v6 (`2026-11-13`)
- * → v7 (`2026-11-16`) → v8 (`2026-11-17`).
+ * → v7 (`2026-11-16`) → v8 (`2026-11-17`) → v9 (`2026-11-20`).
  * Kullanıcı başka bir tarihe elle ayarladıysa DOKUNULMAZ; aksi hâlde kişisel plan
  * bozulurdu.
  *
@@ -398,8 +400,10 @@ export function migratePersistedState(persisted: unknown, fromVersion: number): 
     if (settings.programStart === V5_PROGRAM_START) settings.programStart = V6_PROGRAM_START;
     // v6 -> v7: önceki program başlangıcı (16.11.2026 Pazartesi).
     if (settings.programStart === V6_PROGRAM_START) settings.programStart = V7_PROGRAM_START;
-    // v7 -> v8: yeni program başlangıcı (17.11.2026 Salı).
-    if (settings.programStart === V7_PROGRAM_START) settings.programStart = MIGRATED_PROGRAM_START;
+    // v7 -> v8: önceki program başlangıcı (17.11.2026 Salı).
+    if (settings.programStart === V7_PROGRAM_START) settings.programStart = V8_PROGRAM_START;
+    // v8 -> v9: yeni program başlangıcı (20.11.2026 Cuma).
+    if (settings.programStart === V8_PROGRAM_START) settings.programStart = MIGRATED_PROGRAM_START;
     p.settings = settings;
   }
   return p;

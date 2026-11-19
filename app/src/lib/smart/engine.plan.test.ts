@@ -143,7 +143,7 @@ describe("planPace kapasite", () => {
       pace.teachingDays < pace.studyDays,
       `öğretim günü (${pace.teachingDays}) takvim gününden (${pace.studyDays}) az olmalı`,
     );
-    assert.ok(pace.teachingDays >= 120, `öğretim günü çok az: ${pace.teachingDays}`);
+    assert.ok(pace.teachingDays >= 117, `öğretim günü çok az: ${pace.teachingDays}`);
   });
 
   it("günde en az 1 yeni konu planlar", () => {
@@ -1441,8 +1441,8 @@ describe("gerçek uygulama entegrasyonu (17.11.2026 – 16.02.2027)", () => {
     assert.ok(fiz.length > 0, "AYT Fizik hiç açılmadı");
     // Kapı aralık başında açılır; yerleşim iyileştirmesi bir gün önce açabilir.
     assert.ok(
-      fiz[0] >= "2026-12-01" && fiz[0] <= "2026-12-08",
-      `AYT Fizik ilk anlatımı ${fiz[0]} (beklenen 01.12–08.12 arası)`,
+      fiz[0] >= "2026-12-04" && fiz[0] <= "2026-12-11",
+      `AYT Fizik ilk anlatımı ${fiz[0]} (beklenen 04.12–11.12 arası)`,
     );
   });
 

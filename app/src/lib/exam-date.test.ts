@@ -218,7 +218,7 @@ describe("hidrasyon onarımı — bozuk tarih diske sabitlenir", () => {
 
   /** Ham persist kaydını (zarf) doğrudan yazar. */
   function seedRaw(settings: unknown) {
-    storage.set(KEY, JSON.stringify({ state: { settings }, version: 8 }));
+    storage.set(KEY, JSON.stringify({ state: { settings }, version: S.PERSIST_VERSION }));
   }
   /** Diskteki ham kaydın ayarlarını döndürür. */
   function rawSettings(): any {
@@ -262,7 +262,7 @@ describe("hidrasyon onarımı — bozuk tarih diske sabitlenir", () => {
   });
 
   it("(18) eksik/boş ayar nesnesi güvenle ele alınır, yazma yapılmaz", async () => {
-    storage.set(KEY, JSON.stringify({ state: {}, version: 8 }));
+    storage.set(KEY, JSON.stringify({ state: {}, version: S.PERSIST_VERSION }));
     const before = storage.get(KEY);
     await STORE.persist.rehydrate();
     assert.equal(STORE.getState().settings.examDate, T.EXAM_TARGETS.tyt, "bellek varsayılana dönmedi");

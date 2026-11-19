@@ -79,7 +79,7 @@ export const DEFAULT_SETTINGS: ScheduleSettings = {
   studyMinutes: 240,
   weeklyHours: 26,
   examDate: "2027-06-19",
-  programStart: "2026-11-17",
+  programStart: "2026-11-20",
   mockWeekdays: [6],
   sportDays: [3],
   sportStart: "17:00",
