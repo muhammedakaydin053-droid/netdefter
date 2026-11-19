@@ -2,24 +2,45 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Input, NumInput } from "@/components/ui/input";
 import { HealthBadge, StatusBadge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { SessionDialog } from "@/components/session-dialog";
+import { UnlockDialog } from "@/components/unlock-dialog";
 import { useAppStore } from "@/lib/store";
 import { topicDerived } from "@/lib/stats";
 import { countsIssue } from "@/lib/calc";
+import { topicLocked } from "@/lib/sessions";
 import { topicHealth } from "@/lib/smart/engine";
 import { explainStage, learningStage, STAGE_LABEL } from "@/lib/smart/progress";
 import { formatNet, formatPct, todayISO } from "@/lib/utils";
-import { AYT_SUBJECTS, STATUSES, TYT_SUBJECTS, type Status } from "@/lib/types";
+import { AYT_SUBJECTS, STATUSES, TYT_SUBJECTS, type Status, type TopicRow } from "@/lib/types";
+import { Lock, Plus } from "lucide-react";
 
 export const Route = createFileRoute("/konular")({ component: KonularPage });
 
 function KonularPage() {
   const topics = useAppStore((s) => s.topics);
+  const archivedTopics = useAppStore((s) => s.archivedTopics);
   const daily = useAppStore((s) => s.daily);
   const updateTopic = useAppStore((s) => s.updateTopic);
+  const unlockTopic = useAppStore((s) => s.unlockTopic);
   const [exam, setExam] = useState<"Hepsi" | "TYT" | "AYT">("Hepsi");
   const [subject, setSubject] = useState("Hepsi");
   const [status, setStatus] = useState<"Hepsi" | Status>("Hepsi");
   const [q, setQ] = useState("");
+  const [sessionTopic, setSessionTopic] = useState<TopicRow | null>(null);
+  const [unlockTopic_, setUnlockTopic_] = useState<TopicRow | null>(null);
+
+  // Kilitli konular (bağlı oturumu olanlar) tek geçişte hesaplanır.
+  const lockedIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const t of topics) {
+      if (topicLocked(t.id, daily, topics, archivedTopics)) ids.add(t.id);
+    }
+    return ids;
+  }, [topics, daily, archivedTopics]);
+
+  const lockedCountOf = (id: string) =>
+    daily.filter((d) => d.topicId === id && lockedIds.has(id)).length;
 
   const subjects =
     exam === "AYT"
@@ -81,7 +102,7 @@ function KonularPage() {
         <table className="min-w-[1100px] w-full text-left text-sm">
           <thead className="bg-ink text-primary-fg">
             <tr className="text-xs">
-              {["Sınav", "Ders", "Konu", "Alt konu", "Durum", "Aşama", "Akıllı", "Soru", "D", "Y", "Boş", "Net", "Başarı", "Son çalışma", "Tekrar", "Kaynak"].map((h) => (
+              {["Sınav", "Ders", "Konu", "Alt konu", "Durum", "Aşama", "Akıllı", "Soru", "D", "Y", "Boş", "Net", "Başarı", "Son çalışma", "Tekrar", "Kaynak", "Çalışma"].map((h) => (
                 <th key={h} className="px-2 py-2.5 font-medium">
                   {h}
                 </th>
@@ -162,6 +183,7 @@ function KonularPage() {
                       value={t.total}
                       invalid={issue != null}
                       title={issue ?? undefined}
+                      disabled={lockedIds.has(t.id)}
                       onChange={(v) => updateTopic(t.id, { total: v })}
                     />
                   </td>
@@ -171,6 +193,7 @@ function KonularPage() {
                       max={t.total ?? undefined}
                       invalid={issue != null}
                       title={issue ?? undefined}
+                      disabled={lockedIds.has(t.id)}
                       onChange={(v) => updateTopic(t.id, { correct: v })}
                     />
                   </td>
@@ -180,6 +203,7 @@ function KonularPage() {
                       max={t.total ?? undefined}
                       invalid={issue != null}
                       title={issue ?? undefined}
+                      disabled={lockedIds.has(t.id)}
                       onChange={(v) => updateTopic(t.id, { wrong: v })}
                     />
                   </td>
@@ -209,6 +233,30 @@ function KonularPage() {
                       onChange={(e) => updateTopic(t.id, { source: e.target.value })}
                     />
                   </td>
+                  <td className="px-1 py-1.5">
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        title="Çalışma ekle"
+                        onClick={() => setSessionTopic(t)}
+                      >
+                        <Plus className="size-3.5" />
+                        Çalışma
+                      </Button>
+                      {lockedIds.has(t.id) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title={`Kilitli: ${lockedCountOf(t.id)} bağlı oturum. Kümülatif düzenlenemez.`}
+                          onClick={() => setUnlockTopic_(t)}
+                        >
+                          <Lock className="size-3.5" />
+                          Kilitli
+                        </Button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               );
             })}
@@ -219,6 +267,21 @@ function KonularPage() {
         Net = Doğru − Yanlış / 4 · Boş = Toplam − Doğru − Yanlış · Başarı = Doğru / Toplam. Negatif sayı, toplamdan fazla doğru/yanlış
         ve toplam yokken doğru/yanlış kabul edilmez; başarı %100'ü aşmaz.
       </p>
+      <p className="text-xs text-subtle">
+        Bağlı çalışma oturumu olan konularda kümülatif soru alanları kilitlidir; elle düzeltmek için önce kilidi çöz.
+      </p>
+
+      <SessionDialog open={!!sessionTopic} topic={sessionTopic} onClose={() => setSessionTopic(null)} />
+      <UnlockDialog
+        open={!!unlockTopic_}
+        topicLabel={unlockTopic_ ? `${unlockTopic_.exam} · ${unlockTopic_.subject} · ${unlockTopic_.topic}` : ""}
+        sessionCount={unlockTopic_ ? lockedCountOf(unlockTopic_.id) : 0}
+        onCancel={() => setUnlockTopic_(null)}
+        onConfirm={() => {
+          if (unlockTopic_) unlockTopic(unlockTopic_.id, { confirm: true });
+          setUnlockTopic_(null);
+        }}
+      />
     </div>
   );
 }

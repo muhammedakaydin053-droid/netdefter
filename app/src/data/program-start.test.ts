@@ -1,7 +1,7 @@
 /**
  * Program başlangıç tarihi ve hedef/sınav çapaları — regresyon testleri.
  *
- * Program başlangıcı 16.11.2026 Pazartesi'den 17.11.2026 Salı'ya alındı. Bu
+ * Program başlangıcı 17.11.2026 Salı'dan 20.11.2026 Cuma'ya alındı. Bu
  * dosya, tarih kaydırmasının yalnızca başlangıcı değiştirdiğini; sınav
  * tarihlerinin, tur hedeflerinin, kapasite basamaklarının ve AYT ön koşul
  * kapılarının DEĞİŞMEDİĞİNİ kilitler.
@@ -37,11 +37,11 @@ after(async () => {
 });
 
 describe("program başlangıcı — yeni tarih", () => {
-  it("varsayılan program başlangıcı 17.11.2026 (Salı)", () => {
-    assert.equal(TYPES.DEFAULT_SETTINGS.programStart, "2026-11-17");
-    assert.equal(TARGETS.programStart, "2026-11-17");
-    // 17.11.2026 Salı olmalı (gün indeksi 2).
-    assert.equal(new Date("2026-11-17T12:00:00").getDay(), 2);
+  it("varsayılan program başlangıcı 20.11.2026 (Cuma)", () => {
+    assert.equal(TYPES.DEFAULT_SETTINGS.programStart, "2026-11-20");
+    assert.equal(TARGETS.programStart, "2026-11-20");
+    // 20.11.2026 Cuma olmalı (gün indeksi 5).
+    assert.equal(new Date("2026-11-20T12:00:00").getDay(), 5);
   });
 
   it("sınav tarihleri DEĞİŞMEDİ", () => {
@@ -86,25 +86,25 @@ describe("planlama kuralları — tarih kaydırmasında değişmedi", () => {
   });
 
   it("faz takvimi yeni başlangıçtan başlar ve hedef çapalara oturur", () => {
-    const tl = TIMELINE.buildTimeline("2026-11-17", "2027-06-19");
-    assert.equal(tl[0].from, "2026-11-17");
+    const tl = TIMELINE.buildTimeline("2026-11-20", "2027-06-19");
+    assert.equal(tl[0].from, "2026-11-20");
     assert.equal(tl.at(-1).to, "2027-06-19");
     // Sınırlar görünür hedef tarihlere çapalı (TYT 15.02.2027).
     assert.deepEqual(
       tl.map((p: any) => p.from),
-      ["2026-11-17", "2027-02-15", "2027-04-23", "2027-05-07", "2027-05-17"],
+      ["2026-11-20", "2027-02-15", "2027-04-23", "2027-05-07", "2027-05-17"],
     );
   });
-  describe("plan üretimi — 17.11.2026 başlangıcı (gerçek ekran çağrısı)", () => {
+  describe("plan üretimi — 20.11.2026 başlangıcı (gerçek ekran çağrısı)", () => {
     const addDays = (d: string, n: number) =>
       new Date(Date.parse(d + "T12:00:00Z") + n * 86400000).toISOString().slice(0, 10);
 
-    it("program 17.11.2026 Salı'da başlar; ilk gün akademik görev üretir", () => {
+    it("program 20.11.2026 Cuma'da başlar; ilk gün akademik görev üretir", () => {
       const S = TYPES.DEFAULT_SETTINGS;
-      const { slots } = ENGINE.buildDailyPlan([], [], [], [], [], S, [], "2026-11-17");
+      const { slots } = ENGINE.buildDailyPlan([], [], [], [], [], S, [], "2026-11-20");
       const academic = slots.filter((s: any) => s.exam && s.kind !== "Deneme" && s.kind !== "Yanlış analizi");
-      assert.ok(academic.length > 0, "17.11.2026 (program başlangıcı) boş geçti");
-      const before = ENGINE.buildDailyPlan([], [], [], [], [], S, [], "2026-11-16");
+      assert.ok(academic.length > 0, "20.11.2026 (program başlangıcı) boş geçti");
+      const before = ENGINE.buildDailyPlan([], [], [], [], [], S, [], "2026-11-19");
       assert.equal(before.slots.length, 0, "başlangıç öncesi gün görev üretti");
     });
 
@@ -117,7 +117,7 @@ describe("planlama kuralları — tarih kaydırmasında değişmedi", () => {
       }));
       const lectDays: string[] = [];
       for (let i = 0; i < 7; i++) {
-        const date = addDays("2026-11-17", i);
+        const date = addDays("2026-11-20", i);
         const { slots } = ENGINE.buildDailyPlan(topics, [], [], [], [], S, [], date);
         const lect = slots.filter((s: any) => s.kind === "Konu anlatımı" && s.exam);
         if (lect.length) lectDays.push(date);
@@ -133,7 +133,7 @@ describe("planlama kuralları — tarih kaydırmasında değişmedi", () => {
       }
       assert.ok(lectDays.length >= 5, `ilk hafta anlatım günü az: ${lectDays.length}`);
       assert.ok(!lectDays.includes("2026-11-22"), "22.11 Pazar günü yeni konu açıldı");
-      assert.equal(lectDays[0], "2026-11-17", "ilk anlatım günü 17.11 olmalı");
+      assert.equal(lectDays[0], "2026-11-20", "ilk anlatım günü 20.11 olmalı");
     });
 
     it("tarih kayması hedef/sınav çapalarını değiştirmez", () => {

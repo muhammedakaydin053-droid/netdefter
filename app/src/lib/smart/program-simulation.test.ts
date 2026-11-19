@@ -1,5 +1,5 @@
 /**
- * Tam dönem simülasyonu — 17.11.2026 → 20.06.2027.
+ * Tam dönem simülasyonu — 20.11.2026 → 20.06.2027.
  *
  * İki senaryo gerçek uygulama çağrısıyla (program.tsx biçimi) işletilir:
  *   1) hiç deneme/yanlış verisi yok,
@@ -275,7 +275,7 @@ function runPeriod(opts: { withData: boolean | "both" }): Metrics {
   };
 }
 
-describe("tam dönem simülasyonu (17.11.2026 – 20.06.2027)", () => {
+describe("tam dönem simülasyonu (20.11.2026 – 20.06.2027)", () => {
   let A: Metrics;
   let B: Metrics;
   before(() => {
@@ -480,7 +480,7 @@ describe("TYT–AYT tam deneme dengesi (sonuç kaydından bağımsız)", () => {
 // devreye girer; ikinci dönem round1Done ile, üçüncü dönem her iki koşulla da
 // kapsanır.
 const PERIODS = [
-  { id: "P1", label: "17.11.2026–09.02.2027 (2:1 fazı)", from: "2026-11-17", to: "2027-02-09", rule: "2:1" as const },
+  { id: "P1", label: "20.11.2026–09.02.2027 (2:1 fazı)", from: "2026-11-20", to: "2027-02-09", rule: "2:1" as const },
   { id: "P2", label: "10.02.2027–20.04.2027 (round1 sonrası 1:1)", from: "2027-02-10", to: "2027-04-20", rule: "1:1" as const },
   { id: "P3", label: "21.04.2027–20.06.2027 (son 60 gün 1:1)", from: "2027-04-21", to: "2027-06-20", rule: "1:1" as const },
 ];

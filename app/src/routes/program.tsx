@@ -2,15 +2,32 @@ import { useEffect, useState, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ReplanDialog } from "@/components/replan-dialog";
+import { IntradayDialog, IntradayOverflowNotice } from "@/components/intraday-dialog";
 import { HealthBadge } from "@/components/ui/badge";
 import { Kpi } from "@/components/kpi";
-import { useAppStore } from "@/lib/store";
-import { aytMockReady, aytUnlocks, gateBlockers, GATE_DEFS, lastExamNet, ROADMAP_PHASES, tytMockReady } from "@/data/roadmap";
-import { buildDailyPlan, buildWeekGrid, mergeTopicSlots, planPace, weeklyBlueprint } from "@/lib/smart/engine";
+import {
+  useAppStore,
+  planAffectingChange,
+  intradayChange,
+  intradayOverflow,
+  type IntradayOverflow,
+} from "@/lib/store";
+import {
+  aytMockReady,
+  aytUnlocks,
+  gateBlockers,
+  GATE_DEFS,
+  lastExamNet,
+  ROADMAP_PHASES,
+  tytMockReady,
+} from "@/data/roadmap";
+import { buildDailyPlan, planPace, weeklyBlueprint } from "@/lib/smart/engine";
+import { frozenTimeline, frozenWeekGrid } from "@/lib/smart/frozen";
 import { phaseFor } from "@/data/sequence";
 import { PLANNING_BANDS_NOTE, SOURCES, SOURCES_CHECKED_AT, TARGETS } from "@/data/targets";
 import { formatDate, formatNet, todayISO } from "@/lib/utils";
-import type { PlanSlot, ScheduleSettings } from "@/lib/smart/types";
+import { EXAM_TARGETS, type PlanSlot, type ScheduleSettings } from "@/lib/smart/types";
 
 export const Route = createFileRoute("/program")({ component: ProgramPage });
 
@@ -49,10 +66,38 @@ function ProgramPage() {
   const branchMockHistory = useAppStore((s) => s.branchMockHistory);
   const markBranchMock = useAppStore((s) => s.markBranchMock);
   const updateSettings = useAppStore((s) => s.updateSettings);
+  const applyIntradaySettings = useAppStore((s) => s.applyIntradaySettings);
   const missYesterday = useAppStore((s) => s.missYesterday);
   const clearCarry = useAppStore((s) => s.clearCarry);
   const replanProgram = useAppStore((s) => s.replanProgram);
-  const { slots, life, analyzedWrongIds, branchMockSubject } = buildDailyPlan(topics, daily, wrongs, tytExams, aytExams, settings, carry, todayISO(), undefined, analyzedWrongs, branchMockHistory);
+  const [replanOpen, setReplanOpen] = useState(false);
+  const frozenPlan = useAppStore((s) => s.frozenPlan);
+  const ensurePlan = useAppStore((s) => s.ensurePlan);
+  const { analyzedWrongIds, branchMockSubject } = buildDailyPlan(
+    topics,
+    daily,
+    wrongs,
+    tytExams,
+    aytExams,
+    settings,
+    carry,
+    todayISO(),
+    undefined,
+    analyzedWrongs,
+    branchMockHistory,
+  );
+  // Dondurulmuş program penceresini tamamla. Yalnızca HENÜZ dondurulmamış günler
+  // üretilir; konu/soru verisi değişince mevcut görevler kaymaz (bkz. `frozen.ts`).
+  useEffect(() => {
+    ensurePlan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    settings.programStart,
+    settings.examDate,
+    settings.studyMinutes,
+    settings.weeklyHours,
+    settings.mockWeekdays.join(","),
+  ]);
   // Yalnızca kullanıcının bugün "Yanlış analizi" günlük kaydıyla GERÇEKTEN
   // tamamladığı yanlışlar işaretlenir. Görev üretmek/yerleştirmek tek başına
   // yeterli değildir; bu yüzden `analyzedWrongIds` artık tamamlanmış görevlerin
@@ -63,7 +108,10 @@ function ProgramPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analyzedWrongIds.join(","), branchMockSubject]);
   const week = weeklyBlueprint(topics, daily, wrongs, settings);
-  const timeline = mergeTopicSlots([...slots, ...life]).sort((a, b) => a.start.localeCompare(b.start));
+  const pace = planPace(topics, settings);
+  // Görünüm DONDURULMUŞ pencereden gelir; canlı motordan değil. Böylece
+  // konu/soru kaydı bugünün ve önümüzdeki günlerin görevlerini kaydırmaz.
+  const timeline = frozenTimeline(frozenPlan[todayISO()]);
   const unlock = aytUnlocks(topics);
   const gateNames = Object.fromEntries(GATE_DEFS.map((g) => [g.subject, g.names]));
   const MAT_NAMES = gateNames["Matematik"];
@@ -72,8 +120,7 @@ function ProgramPage() {
   const nets = lastExamNet(tytExams, aytExams);
   const tytReady = tytMockReady(topics, tytExams);
   const aytReady = aytMockReady(topics, tytExams, aytExams);
-  const weekGrid = buildWeekGrid(topics, daily, wrongs, tytExams, aytExams, settings, carry);
-  const pace = planPace(topics, settings);
+  const weekGrid = frozenWeekGrid(frozenPlan, pace.from, pace.start);
   const phaseId = phaseFor(pace.timeline, todayISO()).id;
   const sunday = new Date().getDay() === 0;
   const beforeStart = settings.programStart > todayISO();
@@ -84,7 +131,9 @@ function ProgramPage() {
         <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted">Akıllı program</p>
         <h1 className="mt-1 text-3xl font-semibold">Günlük ve haftalık plan</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted">
-          Başlangıç {formatDate(pace.start)}. Sınava {pace.daysLeft} gün var ({pace.studyDays} çalışma günü, pazarlar hariç). Bu tempoda günde {pace.perDay} yeni konu. Daha geç başlarsan kalan gün azalır, günlük yük artar.
+          Başlangıç {formatDate(pace.start)}. Sınava {pace.daysLeft} gün var ({pace.studyDays}{" "}
+          çalışma günü, pazarlar hariç). Bu tempoda günde {pace.perDay} yeni konu. Daha geç
+          başlarsan kalan gün azalır, günlük yük artar.
         </p>
         <p className={`mt-2 text-sm ${pace.fits ? "text-muted" : "text-warn"}`}>
           {pace.fits
@@ -92,14 +141,18 @@ function ProgramPage() {
             : `Uyarı: yeni konu penceresi ${pace.teachingDays} gün, kapasite ${pace.capacity} konu ama ${pace.leftTopics} konu kaldı. Günlük ders süresini artır ya da programı öne çek.`}
         </p>
         <p className="mt-1 text-sm text-muted">
-          TYT tek başına: {pace.tytLeft} konu kaldı, günde {pace.perDay} konu ile yaklaşık {pace.tytStudyDays} çalışma günü. Tahmini bitiş {formatDate(pace.tytEta)}. Bu, AYT kapıları kapalıyken TYT'ye ağırlık verildiği varsayımıdır; deneme ve tekrar bu sürenin içindedir.
+          TYT tek başına: {pace.tytLeft} konu kaldı, günde {pace.perDay} konu ile yaklaşık{" "}
+          {pace.tytStudyDays} çalışma günü. Tahmini bitiş {formatDate(pace.tytEta)}. Bu, AYT
+          kapıları kapalıyken TYT'ye ağırlık verildiği varsayımıdır; deneme ve tekrar bu sürenin
+          içindedir.
         </p>
       </div>
 
       <section className="rounded-[var(--radius-xl)] border border-border bg-surface p-5">
         <h2 className="text-lg font-semibold">Faz takvimi</h2>
         <p className="mt-1 text-sm text-muted">
-          Program başlangıçtan sınava kadar beş faza bölünür. Son iki haftada yeni konu açılmaz; tekrar ve deneme kalır.
+          Program başlangıçtan sınava kadar beş faza bölünür. Son iki haftada yeni konu açılmaz;
+          tekrar ve deneme kalır.
         </p>
         <ol className="mt-4 grid gap-2 lg:grid-cols-5">
           {pace.timeline.map((p) => {
@@ -111,14 +164,22 @@ function ProgramPage() {
               >
                 <div className="flex items-center justify-between gap-1">
                   <span className="text-sm font-medium">{p.title}</span>
-                  {active ? <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] text-primary-fg">şimdi</span> : null}
+                  {active ? (
+                    <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] text-primary-fg">
+                      şimdi
+                    </span>
+                  ) : null}
                 </div>
                 <div className="mt-1 text-xs text-muted">
                   {formatDate(p.from)} – {formatDate(p.to)}
                 </div>
                 <div className="mt-1 text-xs text-muted">
                   {p.newTopics ? "yeni konu açık" : "yeni konu kapalı"}
-                  {p.mockIntensity >= 2 ? " · deneme haftada iki" : p.mockIntensity >= 1 ? " · deneme haftada bir" : ""}
+                  {p.mockIntensity >= 2
+                    ? " · deneme haftada iki"
+                    : p.mockIntensity >= 1
+                      ? " · deneme haftada bir"
+                      : ""}
                 </div>
                 <p className="mt-2 text-xs leading-snug">{p.body}</p>
               </li>
@@ -130,7 +191,8 @@ function ProgramPage() {
       <section className="rounded-[var(--radius-xl)] border border-border bg-surface p-5">
         <h2 className="text-lg font-semibold">TYT ne kadar sürer</h2>
         <p className="mt-1 text-sm text-muted">
-          TYT'de {pace.tytLeft} konu var. Günde kaç yeni konu çalıştığına göre bitiş tarihi değişir; pazar günü sayılmaz.
+          TYT'de {pace.tytLeft} konu var. Günde kaç yeni konu çalıştığına göre bitiş tarihi değişir;
+          pazar günü sayılmaz.
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           {pace.tytScenarios.map((s) => (
@@ -145,18 +207,45 @@ function ProgramPage() {
           ))}
         </div>
         <p className="mt-3 text-sm text-muted">
-          Gerçekçi beklenti: konu anlatımı + soru çözümü + tekrar aynı güne sığdığı için günde 1–2 konu en sürdürülebilir tempodur.
-          Günde 3 konu kısa vadede hızlıdır ama tekrar yükü birikir. AYT'ye geçmek için TYT'yi bitirmek şart değildir; matematik, fizik ve kimya kapıları açılınca AYT başlar.
+          Gerçekçi beklenti: konu anlatımı + soru çözümü + tekrar aynı güne sığdığı için günde 1–2
+          konu en sürdürülebilir tempodur. Günde 3 konu kısa vadede hızlıdır ama tekrar yükü
+          birikir. AYT'ye geçmek için TYT'yi bitirmek şart değildir; matematik, fizik ve kimya
+          kapıları açılınca AYT başlar.
         </p>
       </section>
 
       <section className="rounded-[var(--radius-xl)] border border-border bg-surface p-5">
         <h2 className="text-lg font-semibold">Hızlı yol ve kapılar</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Gate title="AYT Mat / Geo" ready={unlock.mat.ready} detail={`${unlock.mat.done}/${unlock.mat.total} TYT sayı çekirdeği`} blockers={gateBlockers(topics, "Matematik", MAT_NAMES)} />
-          <Gate title="AYT Fizik" ready={unlock.fiz.ready} detail={`${unlock.fiz.done}/${unlock.fiz.total} TYT fizik kapısı`} blockers={gateBlockers(topics, "Fizik", FIZ_NAMES)} />
-          <Gate title="AYT Kimya" ready={unlock.kim.ready} detail={`${unlock.kim.done}/${unlock.kim.total} TYT kimya kapısı`} blockers={gateBlockers(topics, "Kimya", KIM_NAMES)} />
-          <Gate title="AYT Biyoloji" ready={unlock.bio.ready} detail={unlock.bio.allDone ? "TYT biyoloji bitti" : unlock.bio.fast ? "Hızlı geçiş (kalıtım bekleyebilir)" : "TYT biyolojiyi bitirmek daha iyi"} />
+          <Gate
+            title="AYT Mat / Geo"
+            ready={unlock.mat.ready}
+            detail={`${unlock.mat.done}/${unlock.mat.total} TYT sayı çekirdeği`}
+            blockers={gateBlockers(topics, "Matematik", MAT_NAMES)}
+          />
+          <Gate
+            title="AYT Fizik"
+            ready={unlock.fiz.ready}
+            detail={`${unlock.fiz.done}/${unlock.fiz.total} TYT fizik kapısı`}
+            blockers={gateBlockers(topics, "Fizik", FIZ_NAMES)}
+          />
+          <Gate
+            title="AYT Kimya"
+            ready={unlock.kim.ready}
+            detail={`${unlock.kim.done}/${unlock.kim.total} TYT kimya kapısı`}
+            blockers={gateBlockers(topics, "Kimya", KIM_NAMES)}
+          />
+          <Gate
+            title="AYT Biyoloji"
+            ready={unlock.bio.ready}
+            detail={
+              unlock.bio.allDone
+                ? "TYT biyoloji bitti"
+                : unlock.bio.fast
+                  ? "Hızlı geçiş (kalıtım bekleyebilir)"
+                  : "TYT biyolojiyi bitirmek daha iyi"
+            }
+          />
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <p className="text-sm text-muted">
@@ -164,11 +253,16 @@ function ProgramPage() {
             {nets.tyt != null ? ` Son TYT net ${nets.tyt.toFixed(1)}.` : " Henüz deneme kaydı yok."}
           </p>
           <p className="text-sm text-muted">
-            AYT deneme: {aytReady ? "açık (TYT 70+ ve kapı var)" : "son TYT net 70+ ve ilgili kapı açık olunca"}.
-            {nets.ayt != null ? ` Son AYT net ${nets.ayt.toFixed(1)}.` : ""}
+            AYT deneme:{" "}
+            {aytReady ? "açık (TYT 70+ ve kapı var)" : "son TYT net 70+ ve ilgili kapı açık olunca"}
+            .{nets.ayt != null ? ` Son AYT net ${nets.ayt.toFixed(1)}.` : ""}
           </p>
         </div>
-        {sunday ? <p className="mt-2 text-sm">Bugün pazar — süre yarıya iner, yeni konu yok, tekrar ve paragraf kalır.</p> : null}
+        {sunday ? (
+          <p className="mt-2 text-sm">
+            Bugün pazar — süre yarıya iner, yeni konu yok, tekrar ve paragraf kalır.
+          </p>
+        ) : null}
         <ol className="mt-4 space-y-2 text-sm text-muted">
           {ROADMAP_PHASES.map((p) => (
             <li key={p.id}>
@@ -183,8 +277,8 @@ function ProgramPage() {
         <p className="mt-1 text-sm text-muted">
           {beforeStart
             ? `Bugün program günü değil. İlk gün ${formatDate(pace.start)}.`
-            : "Bugünden itibaren. Pazar hafif. Deneme, hazır olunca cumartesi."}
-          {" "}Sıfırlarsan başlangıç sıfırladığın güne alınır ve kalan süre yeniden hesaplanır.
+            : "Bugünden itibaren. Pazar hafif. Deneme, hazır olunca cumartesi."}{" "}
+          Sıfırlarsan başlangıç sıfırladığın güne alınır ve kalan süre yeniden hesaplanır.
         </p>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
           {weekGrid.map((d) => (
@@ -194,7 +288,9 @@ function ProgramPage() {
             >
               <div className="flex items-baseline justify-between gap-1">
                 <span className="text-sm font-medium">{DAYS[d.weekday]}</span>
-                <span className="text-xs text-muted">{d.date.slice(8)}.{d.date.slice(5, 7)}</span>
+                <span className="text-xs text-muted">
+                  {d.date.slice(8)}.{d.date.slice(5, 7)}
+                </span>
               </div>
               {d.light ? <div className="mt-1 text-xs text-muted">hafif gün</div> : null}
               {d.startDay ? <div className="mt-1 text-xs text-muted">başlangıç</div> : null}
@@ -204,8 +300,13 @@ function ProgramPage() {
                 ) : (
                   d.slots.map((s) => (
                     <li key={s.id} className="text-xs leading-snug">
-                      <span className="text-muted">{s.start}</span> {s.topic}
+                      <span className={s.unplaced ? "text-warn" : "text-muted"}>
+                        {s.start}
+                        {s.unplaced ? " (eski)" : ""}
+                      </span>{" "}
+                      {s.topic}
                       <span className="text-muted"> · {kindShort(s)}</span>
+                      {s.unplaced ? <span className="text-warn"> · sığmadı</span> : null}
                     </li>
                   ))
                 )}
@@ -222,7 +323,7 @@ function ProgramPage() {
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => replanProgram()}
+          onClick={() => setReplanOpen(true)}
           disabled={settings.programStart === todayISO()}
           title="Programı bugünden yeniden planlar. Konu ve deneme kayıtları korunur."
         >
@@ -243,15 +344,26 @@ function ProgramPage() {
               key={s.id}
               className={`rounded-[var(--radius-md)] border px-3 py-2 ${s.life ? "border-border bg-bg-elevated text-muted" : "border-border bg-surface"}`}
             >
-              <span className="tabular-nums font-medium">{s.ranges?.length ? s.ranges.join(" · ") : `${s.start}–${s.end}`}</span>
-              <span className="ml-2">{s.life ? s.topic : `${s.exam} ${s.subject} — ${s.topic}`}</span>
+              <span className={`tabular-nums font-medium${s.unplaced ? " text-warn" : ""}`}>
+                {s.ranges?.length ? s.ranges.join(" · ") : `${s.start}–${s.end}`}
+                {s.unplaced ? " (eski saat)" : ""}
+              </span>
+              <span className="ml-2">
+                {s.life ? s.topic : `${s.exam} ${s.subject} — ${s.topic}`}
+              </span>
               {!s.life ? (
                 <span className="ml-2 text-xs text-muted">
-                  {kindLabel(s)} · {s.minutes} dk {s.targetQ ? `· ${s.targetQ} soru` : ""} · {s.priority}
+                  {kindLabel(s)} · {s.minutes} dk {s.targetQ ? `· ${s.targetQ} soru` : ""} ·{" "}
+                  {s.priority}
                 </span>
               ) : (
                 <span className="ml-2 text-xs">korunan blok</span>
               )}
+              {s.unplaced ? (
+                <span className="ml-2 text-xs font-medium text-warn">
+                  · yeni zaman ayarlarına sığmadı
+                </span>
+              ) : null}
               {!s.life ? <div className="text-xs text-muted">{s.reason}</div> : null}
             </li>
           ))}
@@ -277,7 +389,8 @@ function ProgramPage() {
                 {formatDate(p.from)} – {formatDate(p.to)}
               </span>
               <span className="text-xs text-muted">
-                {p.newTopics ? "yeni konu açık" : "yeni konu kapalı"} · deneme yoğunluğu {p.mockIntensity}
+                {p.newTopics ? "yeni konu açık" : "yeni konu kapalı"} · deneme yoğunluğu{" "}
+                {p.mockIntensity}
               </span>
             </li>
           ))}
@@ -289,7 +402,8 @@ function ProgramPage() {
           <Kpi label="AYT günlük tempo" value={pace.aytPerDay} />
         </div>
         <p className="mt-3 text-sm text-muted">
-          TYT tahmini bitiş: {formatDate(pace.tytEta)} · Öğretim günü: {pace.teachingDays} · Kapasite: {pace.capacity}
+          TYT tahmini bitiş: {formatDate(pace.tytEta)} · Öğretim günü: {pace.teachingDays} ·
+          Kapasite: {pace.capacity}
         </p>
       </section>
 
@@ -319,16 +433,24 @@ function ProgramPage() {
             {week.nextWeekExtra ? ` · Gelecek hafta ek ağırlık: ${week.nextWeekExtra}` : ""}
           </p>
         ) : (
-          <p className="mt-4 text-sm text-muted">Haftalık zayıf alan için henüz yeterli soru yok.</p>
+          <p className="mt-4 text-sm text-muted">
+            Haftalık zayıf alan için henüz yeterli soru yok.
+          </p>
         )}
         <p className="mt-2 text-sm text-muted">
-          Bu hafta {week.hoursLabel} çalışıldı (hedef {week.weeklyTargetHours} saat) · {week.week.questions} soru · {week.finishedThisWeek} konu bitirildi
-          {week.overdue ? ` · ${week.overdue} tekrar gecikti` : ""}.
-          Kaçırılan gün yarına yığılmaz; “Dünü kaçırdım” ile sonraki günlere yayılır.
+          Bu hafta {week.hoursLabel} çalışıldı (hedef {week.weeklyTargetHours} saat) ·{" "}
+          {week.week.questions} soru · {week.finishedThisWeek} konu bitirildi
+          {week.overdue ? ` · ${week.overdue} tekrar gecikti` : ""}. Kaçırılan gün yarına yığılmaz;
+          “Dünü kaçırdım” ile sonraki günlere yayılır.
         </p>
       </section>
 
-      <SettingsForm settings={settings} onChange={updateSettings} />
+      <SettingsForm
+        settings={settings}
+        onChange={updateSettings}
+        onIntraday={applyIntradaySettings}
+        overflow={intradayOverflow(frozenPlan)}
+      />
 
       <section className="rounded-[var(--radius-xl)] border border-border bg-surface p-5">
         <h2 className="text-lg font-semibold">Plan kararlarının kaynakları</h2>
@@ -362,6 +484,14 @@ function ProgramPage() {
           {PLANNING_BANDS_NOTE}
         </p>
       </section>
+      <ReplanDialog
+        open={replanOpen}
+        onCancel={() => setReplanOpen(false)}
+        onConfirm={() => {
+          replanProgram();
+          setReplanOpen(false);
+        }}
+      />
     </div>
   );
 }
@@ -369,37 +499,142 @@ function ProgramPage() {
 function SettingsForm({
   settings,
   onChange,
+  onIntraday,
+  overflow,
 }: {
   settings: ScheduleSettings;
   onChange: (p: Partial<ScheduleSettings>) => void;
+  onIntraday: (p: Partial<ScheduleSettings>) => void;
+  overflow: IntradayOverflow | null;
 }) {
+  // Planı etkileyen bir ayar değiştiğinde kullanıcıyı bilgilendir. Yalnızca
+  // gerçekten değeri değişen alanlarda uyarı çıkar; aynı değeri yeniden yazmak
+  // veya yalnızca gün içi blokları etkileyen bir ayar uyarı göstermez.
+  const [planNotice, setPlanNotice] = useState(false);
+  // Gün içi ayarlar görev saatlerini değiştirir; onay alınmadan uygulanmaz.
+  const [pending, setPending] = useState<Partial<ScheduleSettings> | null>(null);
+  const apply = (patch: Partial<ScheduleSettings>) => {
+    const changed = Object.entries(patch).some(
+      ([k, v]) => JSON.stringify((settings as never)[k]) !== JSON.stringify(v),
+    );
+    if (!changed) return;
+    if (planAffectingChange(patch)) {
+      setPlanNotice(true);
+      onChange(patch);
+      return;
+    }
+    if (intradayChange(patch)) {
+      setPending(patch);
+      return;
+    }
+    onChange(patch);
+  };
   const toggleDay = (key: "mockWeekdays" | "sportDays", d: number) => {
     const cur = settings[key];
-    onChange({ [key]: cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d] });
+    apply({ [key]: cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d] });
   };
   return (
     <section className="rounded-[var(--radius-xl)] border border-border bg-surface p-5">
       <h2 className="text-lg font-semibold">Program ayarları</h2>
-      <p className="mt-1 text-sm text-muted">Uyanma, uyku, spor ve serbest zaman dersin üzerine yazılmaz.</p>
+      <p className="mt-1 text-sm text-muted">
+        Uyanma, uyku, spor ve serbest zaman dersin üzerine yazılmaz.
+      </p>
+      {planNotice ? (
+        <div
+          role="status"
+          className="mt-3 flex items-start justify-between gap-3 rounded-[var(--radius-md)] border border-border bg-bg-elevated p-3 text-sm"
+        >
+          <span>
+            Programı etkileyen bir ayarı değiştirdin. Bu ayar, önümüzdeki günlerin planını yeniden
+            oluşturur; mevcut ve gelecek görevlerin tarihleri veya sırası değişebilir. Kaydettiğin
+            konu ve soru sonuçları silinmez.
+          </span>
+          <Button variant="ghost" size="sm" onClick={() => setPlanNotice(false)}>
+            Tamam
+          </Button>
+        </div>
+      ) : null}
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Uyanma"><Input type="time" value={settings.wake} onChange={(e) => onChange({ wake: e.target.value })} /></Field>
-        <Field label="Uyuma"><Input type="time" value={settings.sleep} onChange={(e) => onChange({ sleep: e.target.value })} /></Field>
-        <Field label="Günlük ders (dk)"><Input type="number" value={settings.studyMinutes} onChange={(e) => onChange({ studyMinutes: Number(e.target.value) })} /></Field>
-        <Field label="Haftalık hedef (saat)"><Input type="number" value={settings.weeklyHours} onChange={(e) => onChange({ weeklyHours: Number(e.target.value) })} /></Field>
-        <Field label="Hedef sınav"><Input type="date" value={settings.examDate} onChange={(e) => onChange({ examDate: e.target.value })} /></Field>
-        <Field label="Program başlangıcı"><Input type="date" value={settings.programStart} onChange={(e) => onChange({ programStart: e.target.value })} /></Field>
-        <Field label="Günlük paragraf"><Input type="number" value={settings.paragraphTarget} onChange={(e) => onChange({ paragraphTarget: Number(e.target.value) })} /></Field>
-        <Field label="Günlük problem"><Input type="number" value={settings.problemTarget} onChange={(e) => onChange({ problemTarget: Number(e.target.value) })} /></Field>
+        <Field label="Uyanma">
+          <Input
+            type="time"
+            value={settings.wake}
+            onChange={(e) => apply({ wake: e.target.value })}
+          />
+        </Field>
+        <Field label="Uyuma">
+          <Input
+            type="time"
+            value={settings.sleep}
+            onChange={(e) => apply({ sleep: e.target.value })}
+          />
+        </Field>
+        <Field label="Günlük ders (dk)">
+          <Input
+            type="number"
+            value={settings.studyMinutes}
+            onChange={(e) => apply({ studyMinutes: Number(e.target.value) })}
+          />
+        </Field>
+        <Field label="Haftalık hedef (saat)">
+          <Input
+            type="number"
+            value={settings.weeklyHours}
+            onChange={(e) => apply({ weeklyHours: Number(e.target.value) })}
+          />
+        </Field>
+        <Field label="Hedef sınav (sabit)">
+          {/* Sınav tarihi projenin DEĞİŞMEZ hedefidir; düzenlenemez. */}
+          <div
+            aria-readonly="true"
+            title="TYT 19.06.2027 Cumartesi. Bu tarih projenin sabit hedefidir; değiştirilemez."
+            className="flex h-10 items-center rounded-[var(--radius-sm)] border border-border bg-bg-elevated px-3 text-sm text-muted"
+          >
+            {formatDate(EXAM_TARGETS.tyt)}
+          </div>
+        </Field>
+        <Field label="Program başlangıcı">
+          <Input
+            type="date"
+            value={settings.programStart}
+            onChange={(e) => apply({ programStart: e.target.value })}
+          />
+        </Field>
+        <Field label="Günlük paragraf">
+          <Input
+            type="number"
+            value={settings.paragraphTarget}
+            onChange={(e) => apply({ paragraphTarget: Number(e.target.value) })}
+          />
+        </Field>
+        <Field label="Günlük problem">
+          <Input
+            type="number"
+            value={settings.problemTarget}
+            onChange={(e) => apply({ problemTarget: Number(e.target.value) })}
+          />
+        </Field>
         <Field label="Spor saati">
           <div className="flex gap-2">
-            <Input type="time" value={settings.sportStart} onChange={(e) => onChange({ sportStart: e.target.value })} />
-            <Input type="time" value={settings.sportEnd} onChange={(e) => onChange({ sportEnd: e.target.value })} />
+            <Input
+              type="time"
+              value={settings.sportStart}
+              onChange={(e) => apply({ sportStart: e.target.value })}
+            />
+            <Input
+              type="time"
+              value={settings.sportEnd}
+              onChange={(e) => apply({ sportEnd: e.target.value })}
+            />
           </div>
         </Field>
       </div>
       <div className="mt-4">
         <div className="text-xs font-medium text-muted">Deneme günleri</div>
-        <DayToggles selected={settings.mockWeekdays} onToggle={(d) => toggleDay("mockWeekdays", d)} />
+        <DayToggles
+          selected={settings.mockWeekdays}
+          onToggle={(d) => toggleDay("mockWeekdays", d)}
+        />
       </div>
       <div className="mt-3">
         <div className="text-xs font-medium text-muted">Spor günleri</div>
@@ -410,44 +645,91 @@ function SettingsForm({
         {settings.meals.map((m, i) => (
           <div key={m.name} className="flex flex-wrap items-center gap-2">
             <span className="w-20 text-sm">{m.name}</span>
-            <Input className="w-32" type="time" value={m.start} onChange={(e) => {
-              const meals = settings.meals.map((x, j) => (j === i ? { ...x, start: e.target.value } : x));
-              onChange({ meals });
-            }} />
-            <Input className="w-32" type="time" value={m.end} onChange={(e) => {
-              const meals = settings.meals.map((x, j) => (j === i ? { ...x, end: e.target.value } : x));
-              onChange({ meals });
-            }} />
-          </div>
-        ))}
-      </div>
-      <div className="mt-4 space-y-2">
-        <div className="text-xs font-medium text-muted">Serbest zaman (oyun, dizi, YouTube, dinlenme)</div>
-        {settings.leisure.map((l, i) => (
-          <div key={l.name} className="space-y-1 rounded-[var(--radius-md)] border border-border p-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="w-36 text-sm">{l.name}</span>
-              <Input className="w-32" type="time" value={l.start} onChange={(e) => {
-                const leisure = settings.leisure.map((x, j) => (j === i ? { ...x, start: e.target.value } : x));
-                onChange({ leisure });
-              }} />
-              <Input className="w-32" type="time" value={l.end} onChange={(e) => {
-                const leisure = settings.leisure.map((x, j) => (j === i ? { ...x, end: e.target.value } : x));
-                onChange({ leisure });
-              }} />
-            </div>
-            <DayToggles
-              selected={l.days}
-              onToggle={(d) => {
-                const leisure = settings.leisure.map((x, j) =>
-                  j === i ? { ...x, days: x.days.includes(d) ? x.days.filter((y) => y !== d) : [...x.days, d] } : x,
+            <Input
+              className="w-32"
+              type="time"
+              value={m.start}
+              onChange={(e) => {
+                const meals = settings.meals.map((x, j) =>
+                  j === i ? { ...x, start: e.target.value } : x,
                 );
-                onChange({ leisure });
+                apply({ meals });
+              }}
+            />
+            <Input
+              className="w-32"
+              type="time"
+              value={m.end}
+              onChange={(e) => {
+                const meals = settings.meals.map((x, j) =>
+                  j === i ? { ...x, end: e.target.value } : x,
+                );
+                apply({ meals });
               }}
             />
           </div>
         ))}
       </div>
+      <div className="mt-4 space-y-2">
+        <div className="text-xs font-medium text-muted">
+          Serbest zaman (oyun, dizi, YouTube, dinlenme)
+        </div>
+        {settings.leisure.map((l, i) => (
+          <div
+            key={l.name}
+            className="space-y-1 rounded-[var(--radius-md)] border border-border p-2"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="w-36 text-sm">{l.name}</span>
+              <Input
+                className="w-32"
+                type="time"
+                value={l.start}
+                onChange={(e) => {
+                  const leisure = settings.leisure.map((x, j) =>
+                    j === i ? { ...x, start: e.target.value } : x,
+                  );
+                  apply({ leisure });
+                }}
+              />
+              <Input
+                className="w-32"
+                type="time"
+                value={l.end}
+                onChange={(e) => {
+                  const leisure = settings.leisure.map((x, j) =>
+                    j === i ? { ...x, end: e.target.value } : x,
+                  );
+                  apply({ leisure });
+                }}
+              />
+            </div>
+            <DayToggles
+              selected={l.days}
+              onToggle={(d) => {
+                const leisure = settings.leisure.map((x, j) =>
+                  j === i
+                    ? {
+                        ...x,
+                        days: x.days.includes(d) ? x.days.filter((y) => y !== d) : [...x.days, d],
+                      }
+                    : x,
+                );
+                apply({ leisure });
+              }}
+            />
+          </div>
+        ))}
+      </div>
+      <IntradayOverflowNotice overflow={overflow} />
+      <IntradayDialog
+        open={pending !== null}
+        onCancel={() => setPending(null)}
+        onConfirm={() => {
+          if (pending) onIntraday(pending);
+          setPending(null);
+        }}
+      />
     </section>
   );
 }
@@ -467,7 +749,13 @@ function Gate({
     reason: string;
     correct: number;
     total: number;
-    subtopics: { name: string; stageLabel: string; reason: string; correct: number; total: number }[];
+    subtopics: {
+      name: string;
+      stageLabel: string;
+      reason: string;
+      correct: number;
+      total: number;
+    }[];
   }[];
 }) {
   const [open, setOpen] = useState(false);

@@ -98,6 +98,19 @@ export interface DailyRow {
   correct: number | null;
   wrong: number | null;
   note: string;
+  /**
+   * Bağlı çalışma oturumu alanları (isteğe bağlı). Yalnızca Konularım'dan
+   * üretilen oturumlarda bulunur; eski/bağımsız kayıtlarda YOKTUR ve öyle kalır.
+   * Bağlı oturumun geçerliliği `lib/sessions.ts` `isBoundSession` ile belirlenir.
+   */
+  topicId?: string;
+  origin?: "session";
+  /**
+   * Oturumun konu kümülatifine eklediği GERÇEK delta (kırpma sonrası). Silme ve
+   * düzenlemede tersine çevirme bu alanla yapılır. `applied` yoksa/bozuksa kayıt
+   * bağlı sayılmaz ve kümülatife hiçbir katkı sağlamaz.
+   */
+  applied?: { total: number; correct: number; wrong: number };
 }
 
 export const TYT_SUBJECTS = [
