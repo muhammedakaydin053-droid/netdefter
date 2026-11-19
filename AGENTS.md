@@ -48,8 +48,8 @@ version; `ARSIV-BILGISI.txt` records the source commit and the SHA-256.
 
 ## Domain logic you must not break
 
-- **Exam anchor.** `DEFAULT_SETTINGS` in `src/lib/store.ts` pins `examDate`
-  `"2027-06-19"` (TYT, Cumartesi) and `programStart` `"2026-11-17"` (Salı). The whole
+- **Exam anchor.** `DEFAULT_SETTINGS` in `src/lib/smart/types.ts` pins `examDate`
+  `"2027-06-19"` (TYT, Cumartesi) and `programStart` `"2026-11-20"` (Cuma). The whole
   plan engine reads these; do not hardcode a different date elsewhere.
 - **Curriculum is the single source of truth for topics.** `src/data/curriculum.json`
   (283 records) is ordered per subject, and `src/data/sequence.ts` derives study
